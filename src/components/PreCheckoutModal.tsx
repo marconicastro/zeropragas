@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Shield, CreditCard, User, Mail, Phone } from 'lucide-react';
-import { useGTM } from '@/hooks/useGTM';
 
 // Schema de validação do formulário
 const checkoutFormSchema = z.object({
@@ -43,7 +42,6 @@ interface PreCheckoutModalProps {
 
 export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheckoutModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { trackFormSubmit, trackCheckoutInitiated, trackButtonClick } = useGTM();
 
   const {
     register,
@@ -93,19 +91,6 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     setIsSubmitting(true);
     
     try {
-      // Track de início de checkout
-      trackCheckoutInitiated({
-        fullName: data.fullName,
-        email: data.email,
-        phone: data.phone,
-      });
-      
-      // Track de envio de formulário
-      trackFormSubmit('pre_checkout_form', {
-        form_fields: ['fullName', 'email', 'phone'],
-        has_phone: true,
-      });
-      
       await onSubmit(data);
       reset();
     } catch (error) {
@@ -119,11 +104,8 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
   React.useEffect(() => {
     if (!isOpen) {
       reset();
-    } else {
-      // Track quando o modal é aberto
-      trackButtonClick('Abrir Modal Checkout', 'pre_checkout_modal');
     }
-  }, [isOpen, reset, trackButtonClick]);
+  }, [isOpen, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -141,12 +123,13 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
           {/* Campo Nome Completo */}
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="flex items-center gap-2 text-sm font-medium">
+            <Label htmlFor="precheckout_full_name" className="flex items-center gap-2 text-sm font-medium">
               <User className="w-4 h-4" />
               Nome Completo *
             </Label>
             <Input
-              id="fullName"
+              id="precheckout_full_name"
+              name="precheckout_full_name"
               placeholder="Ex: João Silva"
               {...register('fullName')}
               className={errors.fullName ? 'border-red-500' : ''}
@@ -158,12 +141,13 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
 
           {/* Campo E-mail */}
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
+            <Label htmlFor="precheckout_email" className="flex items-center gap-2 text-sm font-medium">
               <Mail className="w-4 h-4" />
               E-mail *
             </Label>
             <Input
-              id="email"
+              id="precheckout_email"
+              name="precheckout_email"
               type="email"
               placeholder="seu@email.com"
               {...register('email')}
@@ -176,12 +160,13 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
 
           {/* Campo Telefone */}
           <div className="space-y-2">
-            <Label htmlFor="phone" className="flex items-center gap-2 text-sm font-medium">
+            <Label htmlFor="precheckout_phone" className="flex items-center gap-2 text-sm font-medium">
               <Phone className="w-4 h-4" />
               Telefone *
             </Label>
             <Input
-              id="phone"
+              id="precheckout_phone"
+              name="precheckout_phone"
               placeholder="(11) 99999-9999"
               {...register('phone')}
               onChange={handlePhoneChange}
