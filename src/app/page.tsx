@@ -5,10 +5,8 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
-import { useTracking } from '@/hooks/use-tracking'; // << 1. ADICIONAR IMPORT
 
 export default function App() {
-  const { track } = useTracking(); // << 2. INICIALIZAR O HOOK
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 47,
@@ -19,8 +17,6 @@ export default function App() {
   const [isPreCheckoutModalOpen, setIsPreCheckoutModalOpen] = useState(false);
 
   useEffect(() => {
-    track.viewContent(); // << 3. RASTREAR VIEWCONTENT
-    
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev.seconds > 0) {
@@ -40,14 +36,11 @@ export default function App() {
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
     event.preventDefault();
-    track.initiateCheckout(); // << 4. RASTREAR INITIATE CHECKOUT
     setIsPreCheckoutModalOpen(true);
   };
 
   // Função para processar os dados do pré-checkout e redirecionar
   const handlePreCheckoutSubmit = async (formData) => {
-    track.lead(formData); // << 5. RASTREAR LEAD
-    
     console.log('🚀 Dados recebidos do formulário:', formData);
     
     // Processamento rápido dos dados essenciais
@@ -734,14 +727,6 @@ export default function App() {
                 </a>
                 <span className="text-green-400">•</span>
                 <a 
-                  href="/gtm-validator" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  GTM Validator
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
                   href="/trigger-diagnostic" 
                   className="text-green-200 hover:text-white underline text-xs"
                   target="_blank"
@@ -750,27 +735,11 @@ export default function App() {
                 </a>
                 <span className="text-green-400">•</span>
                 <a 
-                  href="/test-tracking" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Test Tracking
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
                   href="/deep-diagnostic" 
                   className="text-green-200 hover:text-white underline text-xs"
                   target="_blank"
                 >
                   Deep Diagnostic
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/gtm-fix-test" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  GTM Fix Test
                 </a>
                 <span className="text-green-400">•</span>
                 <a 
