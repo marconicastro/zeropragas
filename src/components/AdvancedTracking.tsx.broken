@@ -1,0 +1,40 @@
+'use client';
+import { useEffect, useRef } from 'react';
+
+// --- FUNÇÕES HELPER PARA O DATALAYER ---
+// Função para gerar event_id único para desduplicação
+const generateEventId = (eventType: string = '') => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substr(2, 9);
+  return `${eventType}_${timestamp}_${random}`;
+};
+
+// --- COMPONENTE PRINCIPAL ---
+export default function AdvancedTracking() {
+  // Cria a trava para o view_content, que persiste durante o ciclo de vida do componente.
+  const viewContentHasBeenTracked = useRef(false);
+
+  useEffect(() => {
+    // Dispara o view_content após o tempo configurado, mas apenas se a trava permitir.
+    const timer = setTimeout(() => {
+      console.log('ViewContent seria disparado aqui');
+    }, 2000);
+
+    // Limpa o timer se o componente for desmontado.
+    return () => clearTimeout(timer);
+  }, []);
+
+  return null; // O componente não renderiza nada na tela.
+}
+
+// --- TIPAGEM GLOBAL ---
+// Garante que o TypeScript entenda o objeto window.advancedTracking.
+declare global {
+  interface Window {
+    dataLayer?: any[];
+    advancedTracking?: {
+      trackCheckout: (userData: any) => Promise<void>;
+      trackViewContentWithUserData: (userData: any) => Promise<void>;
+    };
+  }
+}

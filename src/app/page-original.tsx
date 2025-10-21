@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
+import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download, Bug } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
 import { getFacebookCookies, getGoogleClientId, buildURLWithUTM, getStoredUTMParameters } from '@/lib/cookies';
@@ -85,7 +85,7 @@ export default function App() {
     // Construir URL final rapidamente
     const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
     
-    // === CRÍTICO: Disparar initiate checkout com controle de tempo ===
+    // === CRÍTICO: Disparar initiate checkout de forma assíncrona sem bloquear ===
     try {
       // Capturar dados essenciais para rastreamento
       const { fbc, fbp } = getFacebookCookies();
@@ -107,39 +107,35 @@ export default function App() {
         utm_campaign: utmParams.utm_campaign
       };
 
-      console.log('🔥 Iniciando tracking de checkout aprimorado...');
+      console.log('🔥 Disparando initiate checkout de forma assíncrona...');
 
-      // Usar nova função de tracking com controle de tempo
+      // Disparar evento de forma assíncrona NÃO BLOQUEANTE
+      if (typeof window !== 'undefined' && window.advancedTracking) {
+        // Usar Promise sem await para não bloquear o redirecionamento
+        window.advancedTracking.trackCheckout(userData)
+          .then(() => console.log('✅ Initiate checkout disparado com sucesso'))
+          .catch(error => console.log('Erro no rastreamento (não bloqueante):', error));
+      }
+
+      // Salvar dados para uso futuro de forma síncrona
       if (typeof window !== 'undefined') {
-        // Importar dinamicamente a função aprimorada
-        import('@/lib/enhanced-checkout-tracking').then(({ redirectToCheckoutWithTracking }) => {
-          // Salvar dados para uso futuro de forma síncrona
-          const personalDataToSave = {
-            fn: userData.firstName,
-            ln: userData.lastName,
-            em: userData.email,
-            ph: userData.phone
-          };
-          localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
-          
-          // Redirecionar com tracking garantido
-          redirectToCheckoutWithTracking(finalUrlString, userData);
-        }).catch(error => {
-          console.error('Erro ao importar tracking aprimorado:', error);
-          // Fallback para redirecionamento normal
-          window.location.href = finalUrlString;
-        });
-        
-        // Não fechar o modal imediatamente - deixar o fluxo controlar
-        return; // Sair da função sem fechar o modal
+        const personalDataToSave = {
+          fn: userData.firstName,
+          ln: userData.lastName,
+          em: userData.email,
+          ph: userData.phone
+        };
+        localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
       }
 
     } catch (error) {
       console.log('Erro no rastreamento (continuando redirecionamento):', error);
     }
     
-    // Fechar modal e redirecionar (fallback)
+    // Fechar modal e redirecionar IMEDIATAMENTE após o evento
     setIsPreCheckoutModalOpen(false);
+    
+    // Redirecionar sem delay - o evento já foi enviado de forma síncrona
     window.location.href = finalUrlString;
   };
 
@@ -751,7 +747,7 @@ export default function App() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 text-xs sm:text-sm mb-4 sm:mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 text-xs sm:text-sm">
               <div>
                 <h4 className="font-bold mb-1 sm:mb-2">📞 Contato</h4>
                 <p className="text-green-200">maracujalucrativo@gmail.com</p>
@@ -763,76 +759,6 @@ export default function App() {
               <div>
                 <h4 className="font-bold mb-1 sm:mb-2">📋 Políticas</h4>
                 <p className="text-green-200">Termos • Privacidade • Reembolso</p>
-              </div>
-            </div>
-            
-            {/* Ferramentas de Diagnóstico - Apenas para desenvolvimento */}
-            <div className="border-t border-green-700 pt-4 mt-4">
-              <h4 className="font-bold mb-2 text-green-200">🔧 Ferramentas de Diagnóstico</h4>
-              <div className="flex flex-wrap gap-2 justify-center">
-                <a 
-                  href="/debug" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Debug Dashboard
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/gtm-validator" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  GTM Validator
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/trigger-diagnostic" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Trigger Diagnostic
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/test-tracking" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Test Tracking
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/deep-diagnostic" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Deep Diagnostic
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/gtm-fix-test" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  GTM Fix Test
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/checkout-test" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Checkout Test
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/cookie-diagnostic" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Cookie Diagnostic
-                </a>
               </div>
             </div>
           </div>

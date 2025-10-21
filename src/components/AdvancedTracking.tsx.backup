@@ -1,0 +1,984 @@
+'use client';
+import { useEffect, useRef } from 'react';
+import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/metaConfig';
+import { getAllTrackingParams, initializeTracking, getCachedGeographicData, getHighQualityLocationData, validateDataQuality } from '@/lib/cookies';
+import { validateAndFixFacebookEvent, debugFacebookEvent } from '@/lib/facebookPixelValidation';
+
+// --- FUNÇÕES HELPER PARA O DATALAYER ---
+// Função para limpar dados removendo valores vazios e undefined
+const cleanUserData = (userData: any) => {
+  const cleaned = { ...userData };
+  
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === undefined || cleaned[key] === '' || cleaned[key] === null) {
+      delete cleaned[key];
+    }
+  });
+  
+  return cleaned;
+};
+
+// Função para limpar eventos processados antigos (mais de 24 horas)
+const cleanupOldEvents = (): void => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const processedEvents = JSON.parse(localStorage.getItem('fb_processed_events') || '[]');
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    
+    // Remover eventos mais antigos que 24 horas
+    const recentEvents = processedEvents.filter((eventId: string) => {
+      // Extrair timestamp do event_id (formato: timestamp + random)
+      const timestamp = parseInt(eventId.split('.')[0], 36);
+      return timestamp > twentyFourHoursAgo;
+    });
+    
+    if (recentEvents.length !== processedEvents.length) {
+      localStorage.setItem('fb_processed_events', JSON.stringify(recentEvents));
+      console.log(`🧹 Limpos ${processedEvents.length - recentEvents.length} eventos antigos`);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao limpar eventos antigos:', error);
+  }
+};
+
+// Função para verificar se um evento já foi processado
+const isEventProcessed = (eventId: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const processedEvents = JSON.parse(localStorage.getItem('fb_processed_events') || '[]');
+    return processedEvents.includes(eventId);
+  } catch (error) {
+    console.error('❌ Erro ao verificar eventos processados:', error);
+    return false;
+  }
+};
+
+// Função para marcar um evento como processado
+const markEventAsProcessed = (eventId: string): void => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const processedEvents = JSON.parse(localStorage.getItem('fb_processed_events') || '[]');
+    if (!processedEvents.includes(eventId)) {
+      processedEvents.push(eventId);
+      // Manter apenas os últimos 100 eventos para evitar crescimento excessivo
+      if (processedEvents.length > 100) {
+        processedEvents.splice(0, processedEvents.length - 100);
+      }
+      localStorage.setItem('fb_processed_events', JSON.stringify(processedEvents));
+    }
+  } catch (error) {
+    console.error('❌ Erro ao marcar evento como processado:', error);
+  }
+};
+
+// Função para gerar event_id único para desduplicação
+const generateEventId = (eventType: string = '') => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substr(2, 9);
+  return `${eventType}_${timestamp}_${random}`;
+};
+
+// Função para calcular qualidade dos dados
+const calculateDataQualityScore = (userData: any): number => {
+  let score = 0;
+  let maxScore = 0;
+  
+  // Pontuar dados de rastreamento (mais importantes)
+  if (userData.fbc) score += 30;
+  if (userData.fbp) score += 20;
+  if (userData.external_id) score += 10;
+  if (userData.ga_client_id) score += 10;
+  
+  // Pontuar dados de localização
+  if (userData.ct && userData.ct.length > 2) score += 10;
+  if (userData.st && userData.st.length > 1) score += 10;
+  if (userData.zp && userData.zp.length >= 8) score += 10;
+  
+  maxScore = 100; // Score máximo possível
+  
+  return Math.min(score, maxScore);
+};
+
+// Função para obter dados de rastreamento melhorados
+const getImprovedTrackingData = async () => {
+  // Tentar obter dados de localização de alta qualidade novamente
+  const locationData = await getHighQualityLocationData();
+  
+  // Obter parâmetros de rastreamento atualizados
+  const trackingParams = await getAllTrackingParams();
+  
+  return {
+    fbc: trackingParams.fbc,
+    fbp: trackingParams.fbp,
+    ga_client_id: trackingParams.ga_client_id,
+    external_id: trackingParams.external_id,
+    ct: locationData.city,
+    st: locationData.state,
+    zp: locationData.zip,
+    country: locationData.country
+  };
+};
+
+// Função para esperar confirmação de processamento do evento
+const waitForServerSideConfirmation = async (eventId: string, timeout: number = 5000): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+  
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    
+    const checkConfirmation = () => {
+      const processedEvents = JSON.parse(localStorage.getItem('fb_server_confirmed_events') || '[]');
+      
+      if (processedEvents.includes(eventId)) {
+        console.log(`✅ Evento ${eventId} confirmado pelo server-side`);
+        resolve(true);
+        return;
+      }
+      
+      if (Date.now() - startTime > timeout) {
+        console.log(`⏰ Timeout aguardando confirmação do evento ${eventId}`);
+        resolve(false);
+        return;
+      }
+      
+      setTimeout(checkConfirmation, 100); // Verificar a cada 100ms
+    };
+    
+    checkConfirmation();
+  });
+};
+
+// Função para marcar evento como confirmado pelo server-side
+const markServerSideConfirmed = (eventId: string): void => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const confirmedEvents = JSON.parse(localStorage.getItem('fb_server_confirmed_events') || '[]');
+    if (!confirmedEvents.includes(eventId)) {
+      confirmedEvents.push(eventId);
+      // Manter apenas os últimos 50 eventos confirmados
+      if (confirmedEvents.length > 50) {
+        confirmedEvents.splice(0, confirmedEvents.length - 50);
+      }
+      localStorage.setItem('fb_server_confirmed_events', JSON.stringify(confirmedEvents));
+    }
+  } catch (error) {
+    console.error('❌ Erro ao marcar evento como confirmado:', error);
+  }
+};
+
+// Função para enviar eventos com retry e validação de qualidade
+const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries = 3) => {
+  let retries = 0;
+  
+  const attemptSend = async () => {
+    try {
+      // Validar qualidade dos dados antes de enviar com feedback detalhado
+      const validation = validateDataQuality(eventData.user_data);
+      
+      if (META_CONFIG.TRACKING.enableDebugLogs) {
+        console.log(`📊 Validação de dados para ${eventName}:`);
+        console.log(`   - Score: ${validation.score}%`);
+        console.log(`   - Válido: ${validation.isValid ? '✅' : '❌'}`);
+        if (validation.issues.length > 0) {
+          console.log(`   - Issues: ${validation.issues.join(', ')}`);
+        }
+      }
+      
+      if (!validation.isValid && retries < maxRetries) {
+        console.log(`📊 Qualidade insuficiente (${validation.score}%) para ${eventName}, tentando novamente... (${retries + 1}/${maxRetries})`);
+        
+        if (META_CONFIG.TRACKING.enableDebugLogs) {
+          console.log(`🔧 Recomendações para melhoria:`);
+          validation.recommendations.forEach(rec => console.log(`   - ${rec}`));
+        }
+        
+        retries++;
+        
+        // Esperar antes de tentar novamente (exponencial backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+        
+        // Recalcular dados com melhor qualidade
+        const improvedData = await getImprovedTrackingData();
+        eventData.user_data = improvedData;
+        
+        return attemptSend();
+      }
+      
+      // Enviar evento com dados de qualidade aceitável
+      const validatedEventData = validateAndFixFacebookEvent(eventData);
+      debugFacebookEvent(eventName, validatedEventData);
+      
+      // Log detalhado dos dados antes de enviar
+      console.log(`📤 Enviando evento ${eventName} com dados limpos:`);
+      console.log('🔑 Event ID:', validatedEventData.event_id);
+      console.log('👤 User Data:', validatedEventData.user_data);
+      console.log('🛍️ Custom Data:', validatedEventData.custom_data);
+      
+      window.dataLayer.push(validatedEventData);
+      
+      console.log(`✅ Evento ${eventName} enviado com sucesso!`);
+      console.log(`📊 Qualidade final: ${validation.score}%`);
+      console.log(`🔑 Event ID: ${eventData.event_id}`);
+      
+      if (META_CONFIG.TRACKING.enableDebugLogs) {
+        console.log(`📊 Dados enviados para ${eventName}:`, eventData.user_data);
+        
+        // Log de sucesso com detalhes
+        if (validation.score >= 90) {
+          console.log(`🎉 EXCELENTE! Qualidade de dados acima de 90% para ${eventName}!`);
+        } else if (validation.score >= 80) {
+          console.log(`👍 ÓTIMO! Qualidade de dados acima de 80% para ${eventName}!`);
+        } else if (validation.score >= 70) {
+          console.log(`✅ BOM! Qualidade de dados aceitável para ${eventName}!`);
+        }
+      }
+      
+    } catch (error) {
+      console.error(`❌ Erro ao enviar evento ${eventName}:`, error);
+      if (retries < maxRetries) {
+        retries++;
+        console.log(`🔄 Tentando novamente... (${retries}/${maxRetries})`);
+        setTimeout(attemptSend, 1000 * retries);
+      } else {
+        console.error(`❌ Falha ao enviar evento ${eventName} após ${maxRetries} tentativas`);
+      }
+    }
+  };
+  
+  await attemptSend();
+};
+
+// Cada função tem a responsabilidade única de enviar um evento padronizado para o dataLayer.
+
+/**
+ * Dispara o evento 'view_content' para o dataLayer com formato padronizado.
+ * Utiliza uma trava para garantir que seja disparado apenas uma vez por página.
+ * Inclui dados completos de localização de alta qualidade e cookies do Facebook para melhor matching.
+ */
+const trackViewContent = async (viewContentHasBeenTracked) => {
+  if (viewContentHasBeenTracked.current) {
+    return; // Se já foi disparado, não faz nada.
+  }
+
+  // Limpar eventos antigos antes de processar
+  cleanupOldEvents();
+  
+  // Gerar event_id único para desduplicação
+  const eventId = generateEventId('view_content');
+  
+  // Verificar se este evento já foi processado (evita duplicação entre recarregamentos de página)
+  if (isEventProcessed(eventId)) {
+    console.log('⚠️ ViewContent evento já processado anteriormente, pulando...');
+    return;
+  }
+  
+  // 1. Inicializar tracking primeiro
+  await initializeTracking();
+  
+  // 2. Pequeno delay para garantir processamento do cookie FBC (AJUSTE PONTUAL)
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // 3. Obter dados de localização de ALTA QUALIDADE (prioridade formulário > cache > API)
+  const locationData = await getHighQualityLocationData();
+  
+  // 4. Obter todos os parâmetros de rastreamento (incluindo FBC, FBP, etc.)
+  const trackingParams = await getAllTrackingParams();
+  
+  // 5. Garantir captura do FBC - TENTATIVA AGRESSIVA
+  let fbc = trackingParams.fbc;
+  
+  // Se não tiver FBC, tentar capturar da URL novamente
+  if (!fbc && typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fbclid = urlParams.get('fbclid');
+    
+    if (fbclid) {
+      // Criar FBC no formato correto
+      const timestamp = Date.now();
+      fbc = `fb.1.${timestamp}.${fbclid}`;
+      
+      // Salvar no cookie para futuros eventos
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 90);
+      document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      
+      console.log('🎯 FBC capturado e salvo no ViewContent:', fbc);
+    }
+  }
+  
+  // Se ainda não tiver FBC, tentar obter do cookie novamente
+  if (!fbc && typeof window !== 'undefined') {
+    const fbcCookie = document.cookie.match(new RegExp('(^| )_fbc=([^;]+)'));
+    if (fbcCookie) {
+      fbc = fbcCookie[2];
+      console.log('🎯 FBC obtido do cookie no ViewContent:', fbc);
+    }
+  }
+  
+  // Log do status do FBC para depuração
+  console.log('📊 Status FBC no ViewContent:', fbc ? '✅ Presente' : '❌ Ausente');
+  if (fbc) {
+    console.log('🔑 FBC value:', fbc);
+  }
+  
+  // Usar o MESMO formato do InitiateCheckout para consistência
+  const metaFormattedData = cleanUserData({
+    // ✅ Dados de rastreamento para matching (iguais ao InitiateCheckout)
+    fbc: fbc, // Usar FBC garantido
+    fbp: trackingParams.fbp,
+    ga_client_id: trackingParams.ga_client_id,
+    external_id: trackingParams.external_id,
+    
+    // ✅ Dados geográficos no formato META (mesmo formato do InitiateCheckout)
+    ct: locationData.city,
+    st: locationData.state,
+    zp: locationData.zip,
+    country: locationData.country
+  });
+  
+  // ESTRATÉGIA DE ENVIO GARANTIDO: Server-side PRIMEIRO com confirmação
+  let serverSideSuccess = false;
+  let serverSideConfirmed = false;
+  
+  // 1. TENTAR ENVIAR PARA SERVER-SIDE PRIMEIRO (prioridade máxima)
+  if (typeof window !== 'undefined') {
+    try {
+      console.log('🚀 Tentando enviar view_content para server-side (prioridade máxima)...');
+      
+      // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
+      const serverSideData = {
+        event_name: 'ViewContent', // Nome do evento padrão do Facebook
+        event_id: eventId,
+        pixel_id: '714277868320104', // ID do Pixel do Facebook
+        user_data: {
+          // Dados do usuário no formato que o Facebook Pixel reconhece
+          em: metaFormattedData.em,
+          ph: metaFormattedData.ph,
+          fn: metaFormattedData.fn,
+          ln: metaFormattedData.ln,
+          ct: metaFormattedData.ct,
+          st: metaFormattedData.st,
+          zp: metaFormattedData.zp,
+          country: metaFormattedData.country,
+          client_ip_address: '', // Será preenchido pelo server-side
+          client_user_agent: navigator.userAgent,
+          fbc: metaFormattedData.fbc,
+          fbp: metaFormattedData.fbp,
+          external_id: metaFormattedData.external_id
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: 39.90,
+          content_name: 'Sistema de Controle de Trips - Maracujá',
+          content_category: 'E-book',
+          content_ids: ['6080425'], // ✅ ARRAY CORRETO
+          num_items: '1',
+          contents: [{ // ✅ ARRAY CORRETO
+            id: '6080425',
+            quantity: 1,
+            item_price: 39.90
+          }]
+        }
+      };
+      
+      console.log('🚀 Dados view_content para server-side:', JSON.stringify(serverSideData, null, 2));
+      
+      // Enviar dados para o nosso server-side API
+      const response = await fetch('/api/facebook-pixel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serverSideData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ ViewContent server-side enviado com sucesso!', result);
+        serverSideSuccess = true;
+        
+        // Marcar o evento como enviado para evitar duplicação futura
+        markEventAsProcessed(eventId);
+        
+        // Executar script de confirmação se estiver disponível
+        if (result.clientScript && typeof window !== 'undefined') {
+          try {
+            eval(result.clientScript);
+            console.log('✅ Script de confirmação executado com sucesso');
+          } catch (error) {
+            console.error('❌ Erro ao executar script de confirmação:', error);
+          }
+        }
+        
+        // Aguardar confirmação de processamento (CRÍTICO para ordem correta)
+        console.log('⏳ Aguardando confirmação de processamento do server-side...');
+        serverSideConfirmed = await waitForServerSideConfirmation(eventId, 3000); // 3 segundos de timeout
+        
+        if (serverSideConfirmed) {
+          console.log('✅ Server-side confirmado pelo Facebook - pulando client-side para evitar duplicação');
+          
+          // Marcar eventos server-side como enviados para liberar GTM
+          if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+            window.markServerSideEventsSent();
+          }
+          
+          // Liberar eventos bloqueados do Facebook Pixel
+          if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+            window._releaseBlockedEvents();
+          }
+        } else {
+          console.log('⚠️ Server-side não confirmado - client-side será enviado como backup');
+        }
+        
+      } else {
+        console.error('❌ Falha no ViewContent server-side:', response.status, response.statusText);
+        serverSideSuccess = false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao enviar ViewContent para server-side:', error);
+      serverSideSuccess = false;
+    }
+  }
+
+  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU OU NÃO FOI CONFIRMADO
+  if (!serverSideSuccess || !serverSideConfirmed) {
+    if (!serverSideSuccess) {
+      console.log('🔄 ViewContent server-side falhou, usando fallback para client-side...');
+    } else {
+      console.log('🔄 ViewContent server-side não confirmado, enviando client-side como backup...');
+    }
+    
+    // Delay estratégico para garantir que o server-side tenha tempo de ser processado
+    console.log('⏳ Aguardando 2 segundos antes de enviar client-side (garantir ordem correta)...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const eventData = {
+      event: 'view_content',
+      event_id: eventId, // Mesmo event_id para rastreamento
+      custom_data: {
+        currency: 'BRL',
+        value: 39.90,
+        content_name: 'Sistema de Controle de Trips - Maracujá',
+        content_category: 'E-book',
+        content_ids: ['6080425'], // ✅ ARRAY CORRETO
+        num_items: '1',
+        contents: [{ // ✅ ARRAY CORRETO
+          id: '6080425',
+          quantity: 1,
+          item_price: 39.90
+        }]
+      },
+      user_data: metaFormattedData
+    };
+    
+    // Enviar com sistema de retry e validação de qualidade
+    await sendEventWithRetry('view_content', eventData);
+    
+    console.log('✅ ViewContent fallback client-side enviado com sucesso!');
+  } else {
+    console.log('✅ ViewContent enviado e confirmado via server-side - client-side pulado para evitar duplicação');
+  }
+  
+  if (META_CONFIG.TRACKING.enableDebugLogs) {
+    console.log('🎯 DataLayer Push: view_content (formato padronizado via GTM)');
+    console.log('🔑 Event ID:', eventId);
+    console.log('📍 Dados de localização (ALTA QUALIDADE):', locationData);
+    console.log('📊 Dados formatados (META padrão):', metaFormattedData);
+    console.log('✅ Formato consistente com InitiateCheckout');
+    console.log('🎯 FBC status:', fbc ? '✅ Capturado' : '❌ Não encontrado');
+  }
+  
+  viewContentHasBeenTracked.current = true; // Ativa a trava.
+};
+
+/**
+ * Dispara o evento 'view_content' com dados do usuário fornecidos.
+ * @param {object} userData - Dados do usuário para enriquecer o evento.
+ */
+const trackViewContentWithUserData = async (userData) => {
+  // Limpar eventos antigos antes de processar
+  cleanupOldEvents();
+  
+  // Gerar event_id único para desduplicação
+  const eventId = generateEventId('view_content');
+  
+  // Verificar se este evento já foi processado
+  if (isEventProcessed(eventId)) {
+    console.log('⚠️ ViewContent com userData já processado anteriormente, pulando...');
+    return;
+  }
+  
+  // 1. Inicializar tracking primeiro
+  await initializeTracking();
+  
+  // 2. Obter dados de localização de ALTA QUALIDADE
+  const locationData = await getHighQualityLocationData();
+  
+  // 3. Obter todos os parâmetros de rastreamento
+  const trackingParams = await getAllTrackingParams();
+  
+  // 4. Garantir captura do FBC
+  let fbc = trackingParams.fbc;
+  
+  // Se não tiver FBC, tentar capturar da URL
+  if (!fbc && typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fbclid = urlParams.get('fbclid');
+    
+    if (fbclid) {
+      const timestamp = Date.now();
+      fbc = `fb.1.${timestamp}.${fbclid}`;
+      
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 90);
+      document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      
+      console.log('🎯 FBC capturado e salvo no ViewContent com userData:', fbc);
+    }
+  }
+  
+  // Preparar dados no FORMATO META com dados do usuário fornecidos
+  const metaFormattedData = cleanUserData({
+    // ✅ Dados do usuário fornecidos (alta qualidade)
+    em: userData.email ? userData.email.toLowerCase().trim() : undefined,
+    ph: userData.phone ? userData.phone.replace(/\D/g, '') : undefined,
+    fn: userData.firstName ? userData.firstName.trim() : undefined,
+    ln: userData.lastName ? userData.lastName.trim() : undefined,
+    
+    // ✅ Dados geográficos
+    ct: locationData.city || userData.city,
+    st: locationData.state || userData.state,
+    zp: locationData.zip || userData.zip,
+    country: locationData.country || userData.country || 'BR',
+    
+    // ✅ Dados de rastreamento
+    fbc: fbc,
+    fbp: trackingParams.fbp,
+    ga_client_id: trackingParams.ga_client_id,
+    external_id: userData.email ? userData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : trackingParams.external_id
+  });
+  
+  // ESTRATÉGIA DE ENVIO: Server-side com fallback Client-side
+  let serverSideSuccess = false;
+  
+  // 1. TENTAR ENVIAR PARA SERVER-SIDE
+  if (typeof window !== 'undefined') {
+    try {
+      console.log('🚀 Tentando enviar view_content com userData para server-side...');
+      
+      const serverSideData = {
+        event_name: 'ViewContent',
+        event_id: eventId,
+        pixel_id: '714277868320104',
+        user_data: {
+          em: metaFormattedData.em,
+          ph: metaFormattedData.ph,
+          fn: metaFormattedData.fn,
+          ln: metaFormattedData.ln,
+          ct: metaFormattedData.ct,
+          st: metaFormattedData.st,
+          zp: metaFormattedData.zp,
+          country: metaFormattedData.country,
+          client_ip_address: '',
+          client_user_agent: navigator.userAgent,
+          fbc: metaFormattedData.fbc,
+          fbp: metaFormattedData.fbp,
+          external_id: metaFormattedData.external_id
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: 39.90,
+          content_name: 'Sistema de Controle de Trips - Maracujá',
+          content_category: 'E-book',
+          content_ids: ['6080425'],
+          num_items: '1',
+          contents: [{
+            id: '6080425',
+            quantity: 1,
+            item_price: 39.90
+          }]
+        }
+      };
+      
+      const response = await fetch('/api/facebook-pixel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serverSideData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ ViewContent com userData server-side enviado com sucesso!', result);
+        serverSideSuccess = true;
+        markEventAsProcessed(eventId);
+      } else {
+        console.error('❌ Falha no ViewContent com userData server-side:', response.status);
+        serverSideSuccess = false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao enviar ViewContent com userData para server-side:', error);
+      serverSideSuccess = false;
+    }
+  }
+
+  // 2. FALLBACK PARA CLIENT-SIDE
+  if (!serverSideSuccess) {
+    console.log('🔄 ViewContent com userData server-side falhou, usando fallback client-side...');
+    
+    const eventData = {
+      event: 'view_content',
+      event_id: eventId,
+      custom_data: {
+        currency: 'BRL',
+        value: 39.90,
+        content_name: 'Sistema de Controle de Trips - Maracujá',
+        content_category: 'E-book',
+        content_ids: ['6080425'],
+        num_items: '1',
+        contents: [{
+          id: '6080425',
+          quantity: 1,
+          item_price: 39.90
+        }]
+      },
+      user_data: metaFormattedData
+    };
+    
+    await sendEventWithRetry('view_content', eventData);
+    console.log('✅ ViewContent com userData fallback client-side enviado com sucesso!');
+  }
+  
+  if (META_CONFIG.TRACKING.enableDebugLogs) {
+    console.log('🎯 ViewContent com userData enviado com qualidade melhorada!');
+    console.log('📊 Dados do usuário incluídos:', {
+      email: metaFormattedData.em ? '✅' : '❌',
+      phone: metaFormattedData.ph ? '✅' : '❌',
+      firstName: metaFormattedData.fn ? '✅' : '❌',
+      lastName: metaFormattedData.ln ? '✅' : '❌'
+    });
+  }
+};
+
+/**
+ * Dispara o evento 'initiate_checkout' com os dados do usuário otimizados para Meta EQM.
+ * @param {object} userData - Os dados capturados do formulário de pré-checkout.
+ */
+const trackCheckout = async (userData) => {
+  // Limpar eventos antigos antes de processar
+  cleanupOldEvents();
+  
+  // Gerar event_id único e consistente com o mesmo padrão dos outros eventos
+  const eventId = generateEventId('initiate_checkout');
+  
+  // Verificar se este evento já foi processado (evita duplicação entre recarregamentos de página)
+  if (isEventProcessed(eventId)) {
+    console.log('⚠️ InitiateCheckout evento já processado anteriormente, pulando...');
+    return;
+  }
+  
+  // Obter dados de localização de ALTA QUALIDADE (prioridade formulário > cache > API)
+  const locationData = await getHighQualityLocationData();
+  
+  // Preparar dados no FORMATO META que o Facebook reconhece - MELHORADO
+  const metaFormattedData = cleanUserData({
+    // ✅ Dados do usuário no formato que o Facebook entende
+    em: userData.email ? userData.email.toLowerCase().trim() : undefined,           // Email - apenas se existir
+    ph: userData.phone ? userData.phone.replace(/\D/g, '') : undefined,              // Telefone - apenas se existir
+    fn: userData.firstName ? userData.firstName.trim() : undefined,                    // Primeiro nome - apenas se existir
+    ln: userData.lastName ? userData.lastName.trim() : undefined,                     // Sobrenome - apenas se existir
+    
+    // ✅ Dados geográficos - usar dados de ALTA QUALIDADE com fallback para formulário
+    ct: locationData.city || userData.city || undefined,           // Cidade - apenas se existir
+    st: locationData.state || userData.state || undefined,          // Estado - apenas se existir
+    zp: locationData.zip || userData.zip || undefined,            // CEP - apenas se existir
+    country: locationData.country || userData.country || 'BR',     // País - sempre BR
+    
+    // ✅ Dados de rastreamento para matching
+    fbc: userData.fbc,
+    fbp: userData.fbp,
+    ga_client_id: userData.ga_client_id,
+    external_id: userData.external_id
+  });
+  
+  // Log detalhado para depuração
+  console.log('🌍 Dados geográficos disponíveis:');
+  console.log('   - LocationData API:', locationData);
+  console.log('   - LocationData Formulário:', {
+    city: userData.city,
+    state: userData.state,
+    zip: userData.zip,
+    country: userData.country
+  });
+  console.log('📧 Dados do usuário disponíveis:');
+  console.log('   - Email:', userData.email);
+  console.log('   - Telefone:', userData.phone);
+  console.log('   - Nome:', userData.firstName, userData.lastName);
+  console.log('🔑 Dados de rastreamento disponíveis:');
+  console.log('   - FBC:', userData.fbc);
+  console.log('   - FBP:', userData.fbp);
+  console.log('   - GA Client ID:', userData.ga_client_id);
+  console.log('   - External ID:', userData.external_id);
+  console.log('✅ Dados finais após limpeza:', metaFormattedData);
+  
+  // ESTRATÉGIA DE ENVIO GARANTIDO: Server-side PRIMEIRO com confirmação
+  let serverSideSuccess = false;
+  let serverSideConfirmed = false;
+  
+  // 1. TENTAR ENVIAR PARA SERVER-SIDE PRIMEIRO (prioridade máxima)
+  if (typeof window !== 'undefined') {
+    try {
+      console.log('🚀 Tentando enviar InitiateCheckout para server-side (prioridade máxima)...');
+      
+      // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
+      const serverSideData = {
+        event_name: 'InitiateCheckout', // Nome do evento padrão do Facebook
+        event_id: eventId,
+        pixel_id: '714277868320104', // ID do Pixel do Facebook
+        user_data: {
+          // Dados do usuário no formato que o Facebook Pixel reconhece
+          em: metaFormattedData.em,
+          ph: metaFormattedData.ph,
+          fn: metaFormattedData.fn,
+          ln: metaFormattedData.ln,
+          ct: metaFormattedData.ct,
+          st: metaFormattedData.st,
+          zp: metaFormattedData.zp,
+          country: metaFormattedData.country,
+          client_ip_address: '', // Será preenchido pelo server-side
+          client_user_agent: navigator.userAgent,
+          fbc: metaFormattedData.fbc,
+          fbp: metaFormattedData.fbp,
+          external_id: metaFormattedData.external_id
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: 39.90,
+          content_name: 'E-book Sistema de Controle de Trips - Maracujá',
+          content_category: 'E-book',
+          content_ids: ['ebook-controle-trips'], // ✅ ARRAY CORRETO
+          num_items: '1',
+          items: [{ // ✅ ARRAY CORRETO
+            item_id: 'ebook-controle-trips',
+            item_name: 'E-book Sistema de Controle de Trips',
+            quantity: 1,
+            price: 39.90,
+            item_category: 'E-book',
+            item_brand: 'Maracujá Zero Pragas',
+            currency: 'BRL'
+          }]
+        }
+      };
+      
+      console.log('🚀 Dados InitiateCheckout para server-side:', JSON.stringify(serverSideData, null, 2));
+      
+      // Enviar dados para o nosso server-side API
+      const response = await fetch('/api/facebook-pixel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serverSideData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ InitiateCheckout server-side enviado com sucesso!', result);
+        serverSideSuccess = true;
+        
+        // Marcar o evento como enviado para evitar duplicação futura
+        markEventAsProcessed(eventId);
+        
+        // Executar script de confirmação se estiver disponível
+        if (result.clientScript && typeof window !== 'undefined') {
+          try {
+            eval(result.clientScript);
+            console.log('✅ Script de confirmação executado com sucesso');
+          } catch (error) {
+            console.error('❌ Erro ao executar script de confirmação:', error);
+          }
+        }
+        
+        // Aguardar confirmação de processamento (CRÍTICO para ordem correta)
+        console.log('⏳ Aguardando confirmação de processamento do server-side...');
+        serverSideConfirmed = await waitForServerSideConfirmation(eventId, 3000); // 3 segundos de timeout
+        
+        if (serverSideConfirmed) {
+          console.log('✅ Server-side confirmado pelo Facebook - pulando client-side para evitar duplicação');
+          
+          // Marcar eventos server-side como enviados para liberar GTM
+          if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+            window.markServerSideEventsSent();
+          }
+          
+          // Liberar eventos bloqueados do Facebook Pixel
+          if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+            window._releaseBlockedEvents();
+          }
+        } else {
+          console.log('⚠️ Server-side não confirmado - client-side será enviado como backup');
+        }
+        
+      } else {
+        console.error('❌ Falha no InitiateCheckout server-side:', response.status, response.statusText);
+        serverSideSuccess = false;
+        
+        // Liberar eventos bloqueados mesmo em caso de falha do servidor
+        console.log('🔓 Liberando eventos bloqueados devido à falha do servidor...');
+        if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+          window.markServerSideEventsSent();
+        }
+        
+        if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+          window._releaseBlockedEvents();
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao enviar InitiateCheckout para server-side:', error);
+      serverSideSuccess = false;
+      
+      // Liberar eventos bloqueados mesmo em caso de erro/exceção
+      console.log('🔓 Liberando eventos bloqueados devido à exceção no servidor...');
+      if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+        window.markServerSideEventsSent();
+      }
+      
+      if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+        window._releaseBlockedEvents();
+      }
+    }
+  }
+
+  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU OU NÃO FOI CONFIRMADO
+  if (!serverSideSuccess || !serverSideConfirmed) {
+    if (!serverSideSuccess) {
+      console.log('🔄 InitiateCheckout server-side falhou, usando fallback para client-side...');
+    } else {
+      console.log('🔄 InitiateCheckout server-side não confirmado, enviando client-side como backup...');
+    }
+    
+    // Delay estratégico para garantir que o server-side tenha tempo de ser processado
+    console.log('⏳ Aguardando 2 segundos antes de enviar client-side (garantir ordem correta)...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const eventData = {
+      event: 'initiate_checkout',
+      event_id: eventId, // Mesmo event_id para rastreamento
+      custom_data: {
+        currency: 'BRL',
+        value: 39.90,
+        content_name: 'E-book Sistema de Controle de Trips - Maracujá',
+        content_category: 'E-book',
+        content_ids: ['ebook-controle-trips'], // ✅ ARRAY CORRETO
+        num_items: '1',
+        items: [{ // ✅ ARRAY CORRETO
+          item_id: 'ebook-controle-trips',
+          item_name: 'E-book Sistema de Controle de Trips',
+          quantity: 1,
+          price: 39.90,
+          item_category: 'E-book',
+          item_brand: 'Maracujá Zero Pragas',
+          currency: 'BRL'
+        }]
+      },
+      user_data: metaFormattedData
+    };
+    
+    // Enviar com sistema de retry e validação de qualidade
+    await sendEventWithRetry('initiate_checkout', eventData);
+    
+    console.log('✅ InitiateCheckout fallback client-side enviado com sucesso!');
+
+  if (META_CONFIG.TRACKING.enableDebugLogs) {
+    console.log('🛒 Initiate Checkout: Enviado com formato OTIMIZADO para Facebook Pixel!');
+    console.log('🔑 Event ID:', eventId);
+    console.log('📊 Dados formatados (META padrão):', metaFormattedData);
+    console.log('🌍 Dados geográficos usados:', locationData);
+    console.log('📈 Ordem de envio: 1° Server-side, 2° Client-side (com 500ms de atraso)');
+    console.log('🎯 Expectativa: Server-side deve ser priorizado e não desduplicado!');
+    
+    // Log de confirmação do formato correto
+    console.log('🎯 Dados do formulário enviados para Facebook Pixel:');
+    console.log('   - Email (em):', metaFormattedData.em);
+    console.log('   - Telefone (ph):', metaFormattedData.ph);
+    console.log('   - Nome (fn):', metaFormattedData.fn);
+    console.log('   - Sobrenome (ln):', metaFormattedData.ln);
+    console.log('   - Cidade (ct):', metaFormattedData.ct);
+    console.log('   - Estado (st):', metaFormattedData.st);
+    console.log('   - CEP (zp):', metaFormattedData.zp);
+    console.log('   - País (country):', metaFormattedData.country);
+    console.log('   - FBC (fbc):', metaFormattedData.fbc);
+    console.log('   - FBP (fbp):', metaFormattedData.fbp);
+    console.log('   - External ID:', metaFormattedData.external_id);
+    console.log('🚀 Dados enviados: Server-side PRIMEIRO (prioridade), depois Client-side (backup)');
+  }
+};
+
+
+// --- COMPONENTE PRINCIPAL ---
+export default function AdvancedTracking() {
+  // Cria a trava para o view_content, que persiste durante o ciclo de vida do componente.
+  const viewContentHasBeenTracked = useRef(false);
+
+  useEffect(() => {
+    // Validar configuração primeiro
+    validateMetaConfig();
+    
+    // Inicializar captura de parâmetros de rastreamento
+    initializeTracking();
+    
+    // Log de inicialização unificada com melhorias
+    if (META_CONFIG.TRACKING.enableDebugLogs) {
+      console.log('🎯 AdvancedTracking: Inicializado com arquitetura OTIMIZADA!');
+      console.log('📊 Todos os eventos (PageView, ViewContent, InitiateCheckout) usam apenas GTM');
+      console.log('🔗 Event ID padrão sincronizado entre todos os eventos');
+      console.log('🌍 Dados geográficos com ALTA QUALIDADE (formulário > cache > API)');
+      console.log('🎯 FBC: Sincronizado e garantido para todos os eventos');
+      console.log('🔄 Sistema de retry automático para qualidade de dados');
+      console.log('📈 Validação detalhada de qualidade com feedback em tempo real');
+      console.log('🚀 Expectativa: Scores de qualidade EXCELENTES (8.0+) para todos os eventos!');
+    }
+    
+    // Dispara o view_content após o tempo configurado, mas apenas se a trava permitir.
+    if (META_CONFIG.TRACKING.enableViewContent) {
+      const timer = setTimeout(async () => {
+        await trackViewContent(viewContentHasBeenTracked);
+      }, META_CONFIG.TRACKING.viewContentDelay);
+
+      // Expondo as funções na janela global para serem chamadas pelo pré-checkout.
+      if (typeof window !== 'undefined') {
+        window.advancedTracking = {
+          // A função trackCheckout é exposta globalmente.
+          trackCheckout,
+          // A nova função para ViewContent com dados do usuário
+          trackViewContentWithUserData,
+        };
+      }
+
+      // Limpa o timer se o componente for desmontado.
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  return null; // O componente não renderiza nada na tela.
+}
+
+// --- TIPAGEM GLOBAL ---
+// Garante que o TypeScript entenda o objeto window.advancedTracking.
+declare global {
+  interface Window {
+    dataLayer?: any[];
+    advancedTracking?: {
+      trackCheckout: (userData: any) => Promise<void>;
+      trackViewContentWithUserData: (userData: any) => Promise<void>;
+    };
+  }
+}

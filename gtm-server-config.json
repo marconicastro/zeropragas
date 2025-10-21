@@ -1,0 +1,426 @@
+{
+  "gtm_server_configuration": {
+    "container_info": {
+      "name": "[SERVER] Ebook Trips",
+      "server_url": "https://data.maracujazeropragas.com",
+      "container_id": "SERVER_CONTAINER_ID",
+      "web_container_id": "GTM-567XZCDX"
+    },
+    
+    "clients": [
+      {
+        "name": "01 - GA4 Client",
+        "type": "ga4_measurement",
+        "parameters": {
+          "measurement_id": "G-CZ0XMXL3RX",
+          "server_container_url": "https://data.maracujazeropragas.com",
+          "transport_url": "https://data.maracujazeropragas.com",
+          "send_to_server_container": true
+        },
+        "triggers": ["All Events"]
+      },
+      {
+        "name": "02 - Meta Conversions API Client",
+        "type": "meta_capi",
+        "parameters": {
+          "pixel_id": "714277868320104",
+          "access_token": "EAAUsqHMv8GcBPlCK8fZCCwQzeWZCHF7ahXf6ZC98FcbiHFdFTykqE58YUksFpe7kAFkUzimeH178A3cZCng1Y8HafbNFKw12h0UeUKzJ4EL2CkHln15yZBoFf2PuMBEJNKXvAKJn8iyuk3AdelxYYpAyKtVjfoEIK3uWFwHrqwds6M1jIE7CCObThayaV8gZDZD",
+          "test_event_code": "TEST12345",
+          "enable_test_events": true
+        },
+        "triggers": ["All Events"]
+      },
+      {
+        "name": "03 - HTTP Request Client",
+        "type": "http_request",
+        "parameters": {
+          "request_url": "https://data.maracujazeropragas.com/api/gtm-server",
+          "request_method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "include_event_parameters": true,
+          "include_user_properties": true
+        },
+        "triggers": ["Custom Events"]
+      }
+    ],
+
+    "tags": [
+      {
+        "name": "01 - GA4 - view_item",
+        "type": "ga4_event",
+        "parameters": {
+          "event_name": "view_item",
+          "measurement_id": "{{GA4 Measurement ID}}",
+          "event_parameters": {
+            "event_id": "{{Event ID}}",
+            "items": [
+              {
+                "item_id": "ebook-controle-trips",
+                "item_name": "E-book Sistema de Controle de Trips",
+                "category": "E-book",
+                "quantity": 1,
+                "price": 39.90,
+                "currency": "BRL"
+              }
+            ],
+            "value": 39.90,
+            "currency": "BRL"
+          }
+        },
+        "triggers": ["view_content Event"]
+      },
+      {
+        "name": "02 - GA4 - begin_checkout",
+        "type": "ga4_event",
+        "parameters": {
+          "event_name": "begin_checkout",
+          "measurement_id": "{{GA4 Measurement ID}}",
+          "event_parameters": {
+            "event_id": "{{Event ID}}",
+            "items": [
+              {
+                "item_id": "ebook-controle-trips",
+                "item_name": "E-book Sistema de Controle de Trips",
+                "category": "E-book",
+                "quantity": 1,
+                "price": 39.90,
+                "currency": "BRL"
+              }
+            ],
+            "value": 39.90,
+            "currency": "BRL"
+          },
+          "user_properties": {
+            "email": "{{Hashed Email}}",
+            "first_name": "{{Hashed First Name}}",
+            "last_name": "{{Hashed Last Name}}",
+            "phone": "{{Hashed Phone}}"
+          }
+        },
+        "triggers": ["initiate_checkout Event"]
+      },
+      {
+        "name": "03 - Meta - ViewContent",
+        "type": "meta_capi_event",
+        "parameters": {
+          "pixel_id": "{{Meta Pixel ID}}",
+          "event_name": "ViewContent",
+          "event_time": "{{Event Timestamp}}",
+          "event_source_url": "{{Page URL}}",
+          "action_source": "website",
+          "event_id": "{{Event ID}}",
+          "user_data": {
+            "em": "{{Hashed Email}}",
+            "ph": "{{Hashed Phone}}",
+            "fn": "{{Hashed First Name}}",
+            "ln": "{{Hashed Last Name}}",
+            "ct": "{{City}}",
+            "st": "{{State}}",
+            "zp": "{{ZIP}}",
+            "country": "{{Country}}",
+            "fbc": "{{FBC Cookie}}",
+            "fbp": "{{FBP Cookie}}",
+            "external_id": "{{External ID}}"
+          },
+          "custom_data": {
+            "content_name": "E-book Sistema de Controle de Trips",
+            "content_category": "E-book",
+            "content_ids": ["ebook-controle-trips"],
+            "content_type": "product",
+            "value": 39.90,
+            "currency": "BRL"
+          }
+        },
+        "triggers": ["view_content Event"]
+      },
+      {
+        "name": "04 - Meta - InitiateCheckout",
+        "type": "meta_capi_event",
+        "parameters": {
+          "pixel_id": "{{Meta Pixel ID}}",
+          "event_name": "InitiateCheckout",
+          "event_time": "{{Event Timestamp}}",
+          "event_source_url": "{{Page URL}}",
+          "action_source": "website",
+          "event_id": "{{Event ID}}",
+          "user_data": {
+            "em": "{{Hashed Email}}",
+            "ph": "{{Hashed Phone}}",
+            "fn": "{{Hashed First Name}}",
+            "ln": "{{Hashed Last Name}}",
+            "ct": "{{City}}",
+            "st": "{{State}}",
+            "zp": "{{ZIP}}",
+            "country": "{{Country}}",
+            "fbc": "{{FBC Cookie}}",
+            "fbp": "{{FBP Cookie}}",
+            "external_id": "{{External ID}}"
+          },
+          "custom_data": {
+            "content_name": "E-book Sistema de Controle de Trips",
+            "content_category": "E-book",
+            "content_ids": ["ebook-controle-trips"],
+            "content_type": "product",
+            "value": 39.90,
+            "currency": "BRL",
+            "num_items": 1
+          }
+        },
+        "triggers": ["initiate_checkout Event"]
+      },
+      {
+        "name": "05 - Meta - PageView",
+        "type": "meta_capi_event",
+        "parameters": {
+          "pixel_id": "{{Meta Pixel ID}}",
+          "event_name": "PageView",
+          "event_time": "{{Event Timestamp}}",
+          "event_source_url": "{{Page URL}}",
+          "action_source": "website",
+          "event_id": "{{Event ID}}",
+          "user_data": {
+            "em": "{{Hashed Email}}",
+            "ph": "{{Hashed Phone}}",
+            "fn": "{{Hashed First Name}}",
+            "ln": "{{Hashed Last Name}}",
+            "ct": "{{City}}",
+            "st": "{{State}}",
+            "zp": "{{ZIP}}",
+            "country": "{{Country}}",
+            "fbc": "{{FBC Cookie}}",
+            "fbp": "{{FBP Cookie}}",
+            "external_id": "{{External ID}}"
+          }
+        },
+        "triggers": ["PageView Event"]
+      }
+    ],
+
+    "triggers": [
+      {
+        "name": "All Events",
+        "type": "custom_event",
+        "custom_event_filter": [
+          {
+            "parameter": [
+              {
+                "key": "arg0",
+                "type": "template",
+                "value": "{{_event_name}}"
+              }
+            ],
+            "type": "contains"
+          }
+        ]
+      },
+      {
+        "name": "view_content Event",
+        "type": "custom_event",
+        "custom_event_filter": [
+          {
+            "parameter": [
+              {
+                "key": "arg0",
+                "type": "template",
+                "value": "{{_event_name}}"
+              },
+              {
+                "key": "arg1",
+                "type": "template",
+                "value": "view_content"
+              }
+            ],
+            "type": "equals"
+          }
+        ]
+      },
+      {
+        "name": "initiate_checkout Event",
+        "type": "custom_event",
+        "custom_event_filter": [
+          {
+            "parameter": [
+              {
+                "key": "arg0",
+                "type": "template",
+                "value": "{{_event_name}}"
+              },
+              {
+                "key": "arg1",
+                "type": "template",
+                "value": "initiate_checkout"
+              }
+            ],
+            "type": "equals"
+          }
+        ]
+      },
+      {
+        "name": "PageView Event",
+        "type": "custom_event",
+        "custom_event_filter": [
+          {
+            "parameter": [
+              {
+                "key": "arg0",
+                "type": "template",
+                "value": "{{_event_name}}"
+              },
+              {
+                "key": "arg1",
+                "type": "template",
+                "value": "page_view"
+              }
+            ],
+            "type": "equals"
+          }
+        ]
+      }
+    ],
+
+    "variables": [
+      {
+        "name": "GA4 Measurement ID",
+        "type": "constant",
+        "parameter": {
+          "value": "G-CZ0XMXL3RX"
+        }
+      },
+      {
+        "name": "Meta Pixel ID",
+        "type": "constant",
+        "parameter": {
+          "value": "714277868320104"
+        }
+      },
+      {
+        "name": "Event ID",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "event_id"
+        }
+      },
+      {
+        "name": "Event Timestamp",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "timestamp"
+        }
+      },
+      {
+        "name": "Page URL",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "page_location"
+        }
+      },
+      {
+        "name": "Hashed Email",
+        "type": "custom_javascript",
+        "parameter": {
+          "code": "function() { var email = {{Event Email}}; if (email) { return sha256(email.toLowerCase().trim()); } return undefined; }"
+        }
+      },
+      {
+        "name": "Hashed First Name",
+        "type": "custom_javascript",
+        "parameter": {
+          "code": "function() { var firstName = {{Event First Name}}; if (firstName) { return sha256(firstName.toLowerCase().trim()); } return undefined; }"
+        }
+      },
+      {
+        "name": "Hashed Last Name",
+        "type": "custom_javascript",
+        "parameter": {
+          "code": "function() { var lastName = {{Event Last Name}}; if (lastName) { return sha256(lastName.toLowerCase().trim()); } return undefined; }"
+        }
+      },
+      {
+        "name": "Hashed Phone",
+        "type": "custom_javascript",
+        "parameter": {
+          "code": "function() { var phone = {{Event Phone}}; if (phone) { return sha256(phone.replace(/[^0-9]/g, '')); } return undefined; }"
+        }
+      },
+      {
+        "name": "Event Email",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.email"
+        }
+      },
+      {
+        "name": "Event First Name",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.first_name"
+        }
+      },
+      {
+        "name": "Event Last Name",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.last_name"
+        }
+      },
+      {
+        "name": "Event Phone",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.phone"
+        }
+      },
+      {
+        "name": "City",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.city"
+        }
+      },
+      {
+        "name": "State",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.state"
+        }
+      },
+      {
+        "name": "ZIP",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.zip"
+        }
+      },
+      {
+        "name": "Country",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "user_data.country"
+        }
+      },
+      {
+        "name": "FBC Cookie",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "fbc"
+        }
+      },
+      {
+        "name": "FBP Cookie",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "fbp"
+        }
+      },
+      {
+        "name": "External ID",
+        "type": "event_data_parameter",
+        "parameter": {
+          "key": "external_id"
+        }
+      }
+    ]
+  }
+}
