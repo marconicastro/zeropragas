@@ -4,11 +4,11 @@
 
 import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 
 const GTM_ID = 'GTM-WCDP2ZLH';
 
-export function GtmScript() {
+function GtmScriptInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -44,5 +44,13 @@ export function GtmScript() {
         }}
       />
     </>
+  );
+}
+
+export function GtmScript() {
+  return (
+    <Suspense>
+      <GtmScriptInner />
+    </Suspense>
   );
 }
