@@ -6,6 +6,8 @@ import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
 import { trackMetaEvent } from '@/components/MetaPixel';
+import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
+import DebugPersistence from '@/components/DebugPersistence';
 
 export default function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -22,6 +24,32 @@ export default function App() {
     '50': false,
     '75': false
   });
+
+  // Estado para dados do usuário (agora com persistência)
+  const [userData, setUserData] = useState<{
+    email?: string;
+    phone?: string;
+    fullName?: string;
+    city?: string;
+    state?: string;
+    cep?: string;
+  }>({});
+
+  // Inicializar dados persistidos ao montar o componente
+  useEffect(() => {
+    const persistedData = getPersistedUserData();
+    if (persistedData) {
+      setUserData({
+        email: persistedData.email,
+        phone: persistedData.phone,
+        fullName: persistedData.fullName,
+        city: persistedData.city,
+        state: persistedData.state,
+        cep: persistedData.cep
+      });
+      console.log('🎯 Dados persistidos carregados no estado do componente');
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -67,15 +95,6 @@ export default function App() {
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
     event.preventDefault();
-    
-    // Disparar evento Lead ao abrir o modal
-    trackMetaEvent('Lead', {
-      content_name: 'Lead - Pré-Checkout Form',
-      content_category: 'Formulário',
-      value: 0.0,
-      currency: 'BRL'
-    });
-    
     setIsPreCheckoutModalOpen(true);
   };
 
@@ -91,13 +110,32 @@ export default function App() {
       .replace(/^-+|-+$/g, '')
       .replace(/^'+|'+$/g, '');
     
+    // Formatação rápida do telefone
+    const phoneClean = formData.phone.replace(/\D/g, '');
+    
+    // Salvar dados PERSISTENTEMENTE (com consentimento implícito ao preencher formulário)
+    const userDataToSave = {
+      email: formData.email,
+      phone: phoneClean,
+      fullName: cleanFullName,
+      city: formData.city?.trim(),
+      state: formData.state?.trim(),
+      cep: formData.cep?.replace(/\D/g, '')
+    };
+    
+    saveUserData(userDataToSave, true); // Consentimento verdadeiro ao preencher formulário
+    
+    // Atualizar estado local
+    setUserData(userDataToSave);
+    
+    console.log('💾 Dados salvos persistentemente:', userDataToSave);
+    
     // Capturar apenas parâmetros essenciais para o checkout
     const additionalParams: Record<string, string> = {};
     additionalParams['name'] = cleanFullName;
     additionalParams['email'] = formData.email;
     
-    // Formatação rápida do telefone
-    const phoneClean = formData.phone.replace(/\D/g, '');
+    // Formatação rápida do telefone (já existe phoneClean do estado userData)
     if (phoneClean.length >= 10 && phoneClean.length <= 11) {
       const ddd = phoneClean.substring(0, 2);
       const numeroCompleto = phoneClean.substring(2);
@@ -120,16 +158,34 @@ export default function App() {
       additionalParams['zip'] = formData.cep.replace(/\D/g, '');
     }
 
-    // Disparar evento InitiateCheckout com Advanced Matching
+    // Disparar evento Lead (agora no momento correto - após preenchimento)
+    trackMetaEvent('Lead', {
+      content_name: 'Lead - Formulário Preenchido',
+      content_category: 'Formulário',
+      value: 0.0,
+      currency: 'BRL',
+      user_data: {
+        em: formData.email,
+        ph: phoneClean,
+        fn: cleanFullName
+      }
+    });
+
+    // Disparar evento InitiateCheckout com Advanced Matching Enriquecido
     trackMetaEvent('InitiateCheckout', {
       value: 39.90,
       currency: 'BRL',
       content_name: 'Sistema 4 Fases - Ebook Trips',
       content_ids: ['I101398692S'],
+      content_type: 'product',
       user_data: {
         em: formData.email,
         ph: phoneClean,
-        fn: cleanFullName
+        fn: cleanFullName,
+        // Dados adicionais para enriquecer EQM (se disponíveis)
+        ...(formData.city && { ct: formData.city.trim() }),
+        ...(formData.state && { st: formData.state.trim() }),
+        ...(formData.cep && { zip: formData.cep.replace(/\D/g, '') })
       }
     });
 
@@ -145,12 +201,13 @@ export default function App() {
   };
 
   const scrollToCheckout = () => {
-    // Disparar evento ViewContent
+    // Disparar evento ViewContent (será enriquecido automaticamente com dados persistidos)
     trackMetaEvent('ViewContent', {
       content_name: 'Sistema 4 Fases - Ebook Trips',
       content_ids: ['I101398692S'],
       value: 39.90,
-      currency: 'BRL'
+      currency: 'BRL',
+      content_type: 'product'
     });
     
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
@@ -158,12 +215,13 @@ export default function App() {
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
   const handleHotmartCheckout = (event) => {
-    // Disparar evento ViewContent
+    // Disparar evento ViewContent (será enriquecido automaticamente com dados persistidos)
     trackMetaEvent('ViewContent', {
       content_name: 'Sistema 4 Fases - Ebook Trips',
       content_ids: ['I101398692S'],
       value: 39.90,
-      currency: 'BRL'
+      currency: 'BRL',
+      content_type: 'product'
     });
     
     // Redirecionar para o novo fluxo com modal
@@ -838,6 +896,9 @@ export default function App() {
         onClose={() => setIsPreCheckoutModalOpen(false)}
         onSubmit={handlePreCheckoutSubmit}
       />
+
+      {/* Componente de Debug (apenas desenvolvimento) */}
+      {process.env.NODE_ENV === 'development' && <DebugPersistence />}
     </div>
   );
 }
