@@ -1,0 +1,772 @@
+{
+  "exportFormat": "GTM",
+  "exportVersion": "1.0",
+  "containerVersion": {
+    "path": "accounts/XXXXXX/containers/XXXXXX/versions/0",
+    "container": {
+      "path": "accounts/XXXXXX/containers/XXXXXX",
+      "accountId": "XXXXXX",
+      "containerId": "GTM-WPDKD23S",
+      "name": "Maracujá Zero Pragas - Web",
+      "publicId": "GTM-WPDKD23S",
+      "usageContext": ["WEB"],
+      "fingerprint": "1234567890",
+      "tagManagerUrl": "https://tagmanager.google.com/#/container/accounts/XXXXXX/containers/XXXXXX/versions/0"
+    },
+    "containerVersionId": "0",
+    "name": "Versão Inicial - 4 Eventos Padronizados",
+    "container": {
+      "path": "accounts/XXXXXX/containers/XXXXXX",
+      "accountId": "XXXXXX",
+      "containerId": "GTM-WPDKD23S"
+    },
+    "fingerprint": "1234567890",
+    "tag": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "1",
+        "name": "GA4 Configuration",
+        "type": "gaawc",
+        "parameter": [
+          {
+            "key": "measurementId",
+            "type": "template",
+            "value": "G-XXXXXXXXXX"
+          },
+          {
+            "key": "serverContainerUrl",
+            "type": "template",
+            "value": "https://collect.maracujazeropragas.com"
+          },
+          {
+            "key": "transportUrl",
+            "type": "template",
+            "value": "https://collect.maracujazeropragas.com"
+          },
+          {
+            "key": "sendPageView",
+            "type": "boolean",
+            "value": "true"
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["2147479553"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "2",
+        "name": "GA4 - page_view",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "key": "measurementId",
+            "type": "template",
+            "value": "{{GA4 Measurement ID}}"
+          },
+          {
+            "key": "eventName",
+            "type": "template",
+            "value": "page_view"
+          },
+          {
+            "key": "eventParameters",
+            "type": "list",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  {
+                    "type": "template",
+                    "key": "event_id",
+                    "value": "{{event_id}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "page_location",
+                    "value": "{{page_location}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "page_title",
+                    "value": "{{page_title}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "page_referrer",
+                    "value": "{{page_referrer}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["2"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "3",
+        "name": "GA4 - view_content",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "key": "measurementId",
+            "type": "template",
+            "value": "{{GA4 Measurement ID}}"
+          },
+          {
+            "key": "eventName",
+            "type": "template",
+            "value": "view_item"
+          },
+          {
+            "key": "eventParameters",
+            "type": "list",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  {
+                    "type": "template",
+                    "key": "event_id",
+                    "value": "{{event_id}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "content_type",
+                    "value": "{{content_type}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "content_ids",
+                    "value": "{{content_ids}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "content_name",
+                    "value": "{{content_name}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "category",
+                    "value": "{{category}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "value",
+                    "value": "{{value}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "currency",
+                    "value": "{{currency}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["3"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "4",
+        "name": "GA4 - lead",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "key": "measurementId",
+            "type": "template",
+            "value": "{{GA4 Measurement ID}}"
+          },
+          {
+            "key": "eventName",
+            "type": "template",
+            "value": "generate_lead"
+          },
+          {
+            "key": "eventParameters",
+            "type": "list",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  {
+                    "type": "template",
+                    "key": "event_id",
+                    "value": "{{event_id}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "value",
+                    "value": "{{value}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "currency",
+                    "value": "{{currency}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "form_id",
+                    "value": "{{form_id}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "form_name",
+                    "value": "{{form_name}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["4"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "5",
+        "name": "GA4 - initiate_checkout",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "key": "measurementId",
+            "type": "template",
+            "value": "{{GA4 Measurement ID}}"
+          },
+          {
+            "key": "eventName",
+            "type": "template",
+            "value": "begin_checkout"
+          },
+          {
+            "key": "eventParameters",
+            "type": "list",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  {
+                    "type": "template",
+                    "key": "event_id",
+                    "value": "{{event_id}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "content_ids",
+                    "value": "{{content_ids}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "content_type",
+                    "value": "{{content_type}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "num_items",
+                    "value": "{{num_items}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "value",
+                    "value": "{{value}}"
+                  },
+                  {
+                    "type": "template",
+                    "key": "currency",
+                    "value": "{{currency}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["5"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "6",
+        "name": "Facebook Pixel - PageView",
+        "type": "html",
+        "parameter": [
+          {
+            "key": "html",
+            "type": "template",
+            "value": "<script>\nfbq('track', 'PageView', {\n  eventID: '{{event_id}}'\n});\n</script>"
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["2147479553"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "7",
+        "name": "Facebook Pixel - ViewContent",
+        "type": "html",
+        "parameter": [
+          {
+            "key": "html",
+            "type": "template",
+            "value": "<script>\nfbq('track', 'ViewContent', {\n  eventID: '{{event_id}}',\n  content_type: '{{content_type}}',\n  content_ids: {{content_ids}},\n  content_name: '{{content_name}}',\n  category: '{{category}}',\n  value: {{value}},\n  currency: '{{currency}}'\n});\n</script>"
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["3"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "8",
+        "name": "Facebook Pixel - Lead",
+        "type": "html",
+        "parameter": [
+          {
+            "key": "html",
+            "type": "template",
+            "value": "<script>\nfbq('track', 'Lead', {\n  eventID: '{{event_id}}',\n  value: {{value}},\n  currency: '{{currency}}'\n});\n</script>"
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["4"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "9",
+        "name": "Facebook Pixel - InitiateCheckout",
+        "type": "html",
+        "parameter": [
+          {
+            "key": "html",
+            "type": "template",
+            "value": "<script>\nfbq('track', 'InitiateCheckout', {\n  eventID: '{{event_id}}',\n  content_ids: {{content_ids}},\n  content_type: '{{content_type}}',\n  num_items: {{num_items}},\n  value: {{value}},\n  currency: '{{currency}}'\n});\n</script>"
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["5"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "tagId": "10",
+        "name": "Server - Forward All Events",
+        "type": "html",
+        "parameter": [
+          {
+            "key": "html",
+            "type": "template",
+            "value": "<script>\n// Envia evento para server GTM\nfetch('https://collect.maracujazeropragas.com/collect', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    event: '{{Event}}',\n    event_id: '{{event_id}}',\n    page_location: '{{page_location}}',\n    page_title: '{{page_title}}',\n    page_referrer: '{{page_referrer}}',\n    user_data: {\n      sha256_email_address: '{{sha256_email_address}}',\n      sha256_phone_number: '{{sha256_phone_number}}',\n      first_name: '{{sha256_first_name}}',\n      last_name: '{{sha256_last_name}}',\n      new_customer: '{{new_customer}}'\n    },\n    content_data: {\n      content_type: '{{content_type}}',\n      content_ids: {{content_ids}},\n      content_name: '{{content_name}}',\n      category: '{{category}}'\n    },\n    lead_data: {\n      form_id: '{{form_id}}',\n      form_name: '{{form_name}}',\n      form_type: '{{form_type}}'\n    },\n    checkout_data: {\n      content_ids: {{content_ids}},\n      content_type: '{{content_type}}',\n      num_items: {{num_items}}\n    },\n    value: {{value}},\n    currency: '{{currency}}',\n    timestamp: new Date().toISOString()\n  })\n});\n</script>"
+          }
+        ],
+        "fingerprint": "1234567890",
+        "firingTriggerId": ["2", "3", "4", "5"],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      }
+    ],
+    "trigger": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "triggerId": "1",
+        "name": "All Pages - Page View",
+        "type": "PAGEVIEW",
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "triggerId": "2",
+        "name": "page_view",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "{{_event}}",
+                "value": "page_view"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "triggerId": "3",
+        "name": "view_content",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "{{_event}}",
+                "value": "view_content"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "triggerId": "4",
+        "name": "lead",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "{{_event}}",
+                "value": "lead"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "triggerId": "5",
+        "name": "initiate_checkout",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "{{_event}}",
+                "value": "initiate_checkout"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "1234567890"
+      }
+    ],
+    "variable": [
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "1",
+        "name": "GA4 Measurement ID",
+        "type": "c",
+        "parameter": [
+          {
+            "key": "value",
+            "type": "template",
+            "value": "G-XXXXXXXXXX"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "2",
+        "name": "event_id",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "event_id"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "3",
+        "name": "page_location",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "page_location"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "4",
+        "name": "page_title",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "page_title"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "5",
+        "name": "page_referrer",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "page_referrer"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "6",
+        "name": "sha256_email_address",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "user_data.sha256_email_address"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "7",
+        "name": "sha256_phone_number",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "user_data.sha256_phone_number"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "8",
+        "name": "sha256_first_name",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "user_data.first_name"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "9",
+        "name": "content_type",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "content_data.content_type"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "10",
+        "name": "content_ids",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "content_data.content_ids"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "11",
+        "name": "content_name",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "content_data.content_name"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "12",
+        "name": "category",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "content_data.category"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "13",
+        "name": "value",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "value"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "14",
+        "name": "currency",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "currency"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "15",
+        "name": "form_id",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "lead_data.form_id"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "16",
+        "name": "form_name",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "lead_data.form_name"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "17",
+        "name": "num_items",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "checkout_data.num_items"
+          }
+        ],
+        "fingerprint": "1234567890"
+      },
+      {
+        "accountId": "XXXXXX",
+        "containerId": "GTM-WPDKD23S",
+        "variableId": "18",
+        "name": "new_customer",
+        "type": "v",
+        "parameter": [
+          {
+            "key": "name",
+            "type": "template",
+            "value": "user_data.new_customer"
+          }
+        ],
+        "fingerprint": "1234567890"
+      }
+    ],
+    "builtInVariable": [
+      {
+        "name": "Page URL",
+        "type": "PAGE_URL"
+      },
+      {
+        "name": "Page Hostname",
+        "type": "PAGE_HOSTNAME"
+      },
+      {
+        "name": "Page Path",
+        "type": "PAGE_PATH"
+      },
+      {
+        "name": "Referrer",
+        "type": "REFERRER"
+      },
+      {
+        "name": "Event",
+        "type": "EVENT"
+      }
+    ],
+    "fingerprint": "1234567890",
+    "tagManagerUrl": "https://tagmanager.google.com/#/container/accounts/XXXXXX/containers/XXXXXX/versions/0"
+  }
+}
