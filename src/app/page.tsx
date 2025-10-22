@@ -25,6 +25,9 @@ export default function App() {
     '75': false
   });
 
+  // Estado para controle de ViewContent (EVITAR DUPLICIDADE)
+  const [viewContentFired, setViewContentFired] = useState(false);
+
   // Estado para dados do usuário (agora com persistência)
   const [userData, setUserData] = useState<{
     email?: string;
@@ -91,6 +94,65 @@ export default function App() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrollEventsFired]);
+
+  // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
+  useEffect(() => {
+    // Disparar ViewContent após 15 segundos na página (indica interesse real)
+    const viewContentTimer = setTimeout(() => {
+      if (!viewContentFired) {
+        trackMetaEvent('ViewContent', {
+          content_name: 'Sistema 4 Fases - Ebook Trips',
+          content_ids: ['I101398692S'],
+          value: 39.90,
+          currency: 'BRL',
+          content_type: 'product',
+          custom_data: {
+            trigger_type: 'timing',
+            time_on_page: 15
+          }
+        });
+        
+        setViewContentFired(true);
+        console.log('🎯 ViewContent disparado por timing (15s)');
+      }
+    }, 15000); // 15 segundos
+
+    // Disparar ViewContent ao atingir 25% de scroll (engajamento inicial)
+    const handleScrollForViewContent = () => {
+      if (!viewContentFired) {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPosition = window.scrollY;
+        const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
+
+        if (scrollPercentage >= 25) {
+          trackMetaEvent('ViewContent', {
+            content_name: 'Sistema 4 Fases - Ebook Trips',
+            content_ids: ['I101398692S'],
+            value: 39.90,
+            currency: 'BRL',
+            content_type: 'product',
+            custom_data: {
+              trigger_type: 'scroll',
+              scroll_depth: 25
+            }
+          });
+          
+          setViewContentFired(true);
+          console.log('🎯 ViewContent disparado por scroll (25%)');
+          
+          // Remover listener após disparar
+          window.removeEventListener('scroll', handleScrollForViewContent);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScrollForViewContent);
+
+    return () => {
+      clearTimeout(viewContentTimer);
+      window.removeEventListener('scroll', handleScrollForViewContent);
+    };
+  }, [viewContentFired]);
 
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
@@ -201,13 +263,17 @@ export default function App() {
   };
 
   const scrollToCheckout = () => {
-    // Disparar evento ViewContent (será enriquecido automaticamente com dados persistidos)
-    trackMetaEvent('ViewContent', {
-      content_name: 'Sistema 4 Fases - Ebook Trips',
+    // Disparar evento específico de CTA (não ViewContent para evitar duplicidade)
+    trackMetaEvent('CTAClick', {
+      content_name: 'CTA - Quero Economizar',
       content_ids: ['I101398692S'],
       value: 39.90,
       currency: 'BRL',
-      content_type: 'product'
+      content_type: 'product',
+      custom_data: {
+        cta_type: 'main_checkout_scroll',
+        action: 'scroll_to_checkout'
+      }
     });
     
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
@@ -215,13 +281,17 @@ export default function App() {
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
   const handleHotmartCheckout = (event) => {
-    // Disparar evento ViewContent (será enriquecido automaticamente com dados persistidos)
-    trackMetaEvent('ViewContent', {
-      content_name: 'Sistema 4 Fases - Ebook Trips',
+    // Disparar evento específico de CTA final (não ViewContent para evitar duplicidade)
+    trackMetaEvent('CTAClick', {
+      content_name: 'CTA - Final Checkout',
       content_ids: ['I101398692S'],
       value: 39.90,
       currency: 'BRL',
-      content_type: 'product'
+      content_type: 'product',
+      custom_data: {
+        cta_type: 'final_checkout_modal',
+        action: 'open_modal'
+      }
     });
     
     // Redirecionar para o novo fluxo com modal
