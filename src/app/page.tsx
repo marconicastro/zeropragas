@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
-import { getFacebookCookies, getGoogleClientId, buildURLWithUTM, getStoredUTMParameters } from '@/lib/cookies';
-import META_CONFIG from '@/lib/metaConfig';
 
 export default function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -83,62 +81,12 @@ export default function App() {
     }
 
     // Construir URL final rapidamente
-    const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
+    const finalUrlString = `https://pay.hotmart.com/I101398692S?${new URLSearchParams(additionalParams).toString()}`;
     
-    // === CRÍTICO: Disparar initiate checkout com controle de tempo ===
-    try {
-      // Capturar dados essenciais para rastreamento
-      const { fbc, fbp } = getFacebookCookies();
-      const clientId = getGoogleClientId();
-      const utmParams = getStoredUTMParameters();
-
-      // Dados essenciais para o evento initiate checkout
-      const userData = {
-        email: formData.email,
-        phone: phoneClean,
-        firstName: formData.fullName.split(' ')[0] || '',
-        lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
-        city: formData.city,
-        state: formData.state,
-        zip: formData.cep?.replace(/\D/g, ''),
-        fbc, fbp, ga_client_id: clientId,
-        utm_source: utmParams.utm_source,
-        utm_medium: utmParams.utm_medium,
-        utm_campaign: utmParams.utm_campaign
-      };
-
-      console.log('🔥 Iniciando tracking de checkout aprimorado...');
-
-      // Usar nova função de tracking com controle de tempo
-      if (typeof window !== 'undefined') {
-        // Importar dinamicamente a função aprimorada
-        import('@/lib/enhanced-checkout-tracking').then(({ redirectToCheckoutWithTracking }) => {
-          // Salvar dados para uso futuro de forma síncrona
-          const personalDataToSave = {
-            fn: userData.firstName,
-            ln: userData.lastName,
-            em: userData.email,
-            ph: userData.phone
-          };
-          localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
-          
-          // Redirecionar com tracking garantido
-          redirectToCheckoutWithTracking(finalUrlString, userData);
-        }).catch(error => {
-          console.error('Erro ao importar tracking aprimorado:', error);
-          // Fallback para redirecionamento normal
-          window.location.href = finalUrlString;
-        });
-        
-        // Não fechar o modal imediatamente - deixar o fluxo controlar
-        return; // Sair da função sem fechar o modal
-      }
-
-    } catch (error) {
-      console.log('Erro no rastreamento (continuando redirecionamento):', error);
-    }
+    // Simular processamento
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Fechar modal e redirecionar (fallback)
+    // Fechar modal e redirecionar
     setIsPreCheckoutModalOpen(false);
     window.location.href = finalUrlString;
   };
@@ -779,14 +727,6 @@ export default function App() {
                 </a>
                 <span className="text-green-400">•</span>
                 <a 
-                  href="/gtm-validator" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  GTM Validator
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
                   href="/trigger-diagnostic" 
                   className="text-green-200 hover:text-white underline text-xs"
                   target="_blank"
@@ -795,27 +735,11 @@ export default function App() {
                 </a>
                 <span className="text-green-400">•</span>
                 <a 
-                  href="/test-tracking" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  Test Tracking
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
                   href="/deep-diagnostic" 
                   className="text-green-200 hover:text-white underline text-xs"
                   target="_blank"
                 >
                   Deep Diagnostic
-                </a>
-                <span className="text-green-400">•</span>
-                <a 
-                  href="/gtm-fix-test" 
-                  className="text-green-200 hover:text-white underline text-xs"
-                  target="_blank"
-                >
-                  GTM Fix Test
                 </a>
                 <span className="text-green-400">•</span>
                 <a 
