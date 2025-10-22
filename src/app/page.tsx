@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
-import { trackMetaEvent } from '@/components/MetaPixel';
+import { trackMetaEvent } from '@/components/CapigPixel';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
-import DebugPersistence from '@/components/DebugPersistence';
+
 
 export default function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -197,7 +197,7 @@ export default function App() {
     additionalParams['name'] = cleanFullName;
     additionalParams['email'] = formData.email;
     
-    // Formatação rápida do telefone (já existe phoneClean do estado userData)
+    // Formatação rápida do telefone (usando phoneClean já declarado acima)
     if (phoneClean.length >= 10 && phoneClean.length <= 11) {
       const ddd = phoneClean.substring(0, 2);
       const numeroCompleto = phoneClean.substring(2);
@@ -300,8 +300,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-  
-
       {/* Barra de Urgência - Otimizada para Mobile */}
       <div className="bg-red-600 text-white py-2 px-2 sm:px-4 text-center animate-pulse">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm font-bold">
@@ -967,8 +965,6 @@ export default function App() {
         onSubmit={handlePreCheckoutSubmit}
       />
 
-      {/* Componente de Debug (apenas desenvolvimento) */}
-      {process.env.NODE_ENV === 'development' && <DebugPersistence />}
     </div>
   );
 }
