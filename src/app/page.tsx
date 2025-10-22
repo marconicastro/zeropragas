@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
+import { trackMetaEvent } from '@/components/MetaPixel';
 
 export default function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -15,6 +16,12 @@ export default function App() {
 
   // Estado para controlar o modal de pré-checkout
   const [isPreCheckoutModalOpen, setIsPreCheckoutModalOpen] = useState(false);
+
+  // Estado para controlar eventos de scroll já disparados
+  const [scrollEventsFired, setScrollEventsFired] = useState({
+    '50': false,
+    '75': false
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -33,9 +40,42 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // useEffect para rastreamento de scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollPosition = window.scrollY;
+      const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
+
+      // Disparar evento de 50% do scroll
+      if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
+        trackMetaEvent('ScrollDepth', { percent: 50 });
+        setScrollEventsFired(prev => ({ ...prev, '50': true }));
+      }
+
+      // Disparar evento de 75% do scroll
+      if (scrollPercentage >= 75 && !scrollEventsFired['75']) {
+        trackMetaEvent('ScrollDepth', { percent: 75 });
+        setScrollEventsFired(prev => ({ ...prev, '75': true }));
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [scrollEventsFired]);
+
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
     event.preventDefault();
+    
+    // Disparar evento Lead ao abrir o modal
+    trackMetaEvent('Lead', {
+      content_name: 'Lead - Pré-Checkout Form',
+      content_category: 'Formulário',
+      value: 0.0,
+      currency: 'BRL'
+    });
+    
     setIsPreCheckoutModalOpen(true);
   };
 
@@ -80,8 +120,21 @@ export default function App() {
       additionalParams['zip'] = formData.cep.replace(/\D/g, '');
     }
 
+    // Disparar evento InitiateCheckout com Advanced Matching
+    trackMetaEvent('InitiateCheckout', {
+      value: 39.90,
+      currency: 'BRL',
+      content_name: 'Sistema 4 Fases - Ebook Trips',
+      content_ids: ['I101398692S'],
+      user_data: {
+        em: formData.email,
+        ph: phoneClean,
+        fn: cleanFullName
+      }
+    });
+
     // Construir URL final rapidamente
-    const finalUrlString = `https://pay.hotmart.com/I101398692S?${new URLSearchParams(additionalParams).toString()}`;
+    const finalUrlString = `https://pay.cakto.com.br/hacr962_605077?${new URLSearchParams(additionalParams).toString()}`;
     
     // Simular processamento
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -92,11 +145,27 @@ export default function App() {
   };
 
   const scrollToCheckout = () => {
+    // Disparar evento ViewContent
+    trackMetaEvent('ViewContent', {
+      content_name: 'Sistema 4 Fases - Ebook Trips',
+      content_ids: ['I101398692S'],
+      value: 39.90,
+      currency: 'BRL'
+    });
+    
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
   const handleHotmartCheckout = (event) => {
+    // Disparar evento ViewContent
+    trackMetaEvent('ViewContent', {
+      content_name: 'Sistema 4 Fases - Ebook Trips',
+      content_ids: ['I101398692S'],
+      value: 39.90,
+      currency: 'BRL'
+    });
+    
     // Redirecionar para o novo fluxo com modal
     openPreCheckoutModal(event);
   };
@@ -648,7 +717,7 @@ export default function App() {
 
                 {/* CTA Final - Responsivo */}
                 <a 
-                  href="https://pay.hotmart.com/I101398692S" 
+                  href="https://pay.cakto.com.br/hacr962_605077" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   id="botao-compra-hotmart" 
