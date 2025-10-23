@@ -91,9 +91,14 @@ export default function App() {
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [scrollEventsFired]);
+    // Adicionar listener apenas uma vez
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Cleanup para remover apenas quando o componente desmontar
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []); // Removido scrollEventsFired das dependências para evitar recriação
 
   // useEffect para ViewContent (ÚNICO DISPARO - timing OU scroll)
   useEffect(() => {
@@ -145,7 +150,7 @@ export default function App() {
       }
     };
 
-    window.addEventListener('scroll', handleScrollForViewContent);
+    window.addEventListener('scroll', handleScrollForViewContent, { passive: true });
     scrollListenerAdded = true;
 
     return () => {
@@ -154,7 +159,7 @@ export default function App() {
         window.removeEventListener('scroll', handleScrollForViewContent);
       }
     };
-  }, [viewContentFired]);
+  }, []); // Removido viewContentFired das dependências para evitar recriação
 
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
@@ -281,22 +286,24 @@ export default function App() {
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Função principal de checkout (LEGADO - mantida para compatibilidade)
+  // Função principal de checkout (REDIRECIONADA PARA O MODAL)
   const handleHotmartCheckout = async (event) => {
-    // Disparar evento específico de CTA final (não ViewContent para evitar duplicidade)
+    event.preventDefault(); // Impedir redirecionamento direto
+    
+    // Disparar evento específico de CTA principal
     await trackMetaEvent('CTAClick', {
-      content_name: 'CTA - Final Checkout',
+      content_name: 'CTA - Principal',
       content_ids: ['I101398692S'],
       value: 39.90,
       currency: 'BRL',
       content_type: 'product',
       custom_data: {
-        cta_type: 'final_checkout_modal',
+        cta_type: 'main_cta',
         action: 'open_modal'
       }
     });
     
-    // Redirecionar para o novo fluxo com modal
+    // Abrir modal de pré-checkout
     openPreCheckoutModal(event);
   };
 
@@ -847,9 +854,7 @@ export default function App() {
 
                 {/* CTA Final - Responsivo */}
                 <a 
-                  href="https://pay.cakto.com.br/hacr962_605077" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                  href="#" 
                   id="botao-compra-hotmart" 
                   onClick={handleHotmartCheckout}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 sm:py-8 px-4 sm:px-6 rounded-lg text-xl sm:text-2xl md:text-3xl transform hover:scale-105 transition-all duration-300 shadow-2xl inline-flex items-center justify-center gap-3 sm:gap-4"
