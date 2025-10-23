@@ -28,7 +28,7 @@ export function fireOptimizedLead(customParams = {}) {
       ct: hashData(userData.city || formData.city),
       st: hashData(userData.state || formData.state),
       zp: hashData(userData.zipCode || formData.zipCode),
-      country: hashData(userData.country || 'BR')
+      country: hashData(userData.country || 'br')
     };
     
     // 4. Parâmetros otimizados para Lead
@@ -181,7 +181,7 @@ function getFormData() {
       email: data.email || data.email_address || data.user_email,
       phone: data.phone || data.telephone || data.user_phone,
       firstName: data.firstName || data.first_name || data.name?.split(' ')[0],
-      lastName: data.lastName || data.last_name || data.name?.split(' ').slice(1).join(' '),
+      lastName: data.lastName || data.last_name || (data.name?.split(' ').length > 1 ? data.name.split(' ').slice(1).join(' ') : ''),
       company: data.company || data.company_name,
       jobTitle: data.jobTitle || data.job_title || data.position,
       city: data.city,

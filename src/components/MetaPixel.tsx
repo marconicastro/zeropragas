@@ -53,6 +53,7 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
       ct: await hashData(formattedUserData.ct),
       st: await hashData(formattedUserData.st),
       zip: await hashData(formattedUserData.zip),
+      country: await hashData(formattedUserData.country),
       external_id: formattedUserData.external_id, // Não hashear external_id
       client_ip_address: formattedUserData.client_ip_address,
       client_user_agent: formattedUserData.client_user_agent
@@ -153,6 +154,7 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
           ct: await hashData(formattedUserData.ct),
           st: await hashData(formattedUserData.st),
           zip: await hashData(formattedUserData.zip),
+          country: await hashData(formattedUserData.country),
           external_id: formattedUserData.external_id,
           client_ip_address: formattedUserData.client_ip_address,
           client_user_agent: formattedUserData.client_user_agent

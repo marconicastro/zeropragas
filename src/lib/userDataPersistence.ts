@@ -133,7 +133,7 @@ export const updatePersistedData = (updates: Partial<PersistedUserData>): void =
   }
 };
 
-// Formatar dados para Meta (Advanced Matching) - CORRIGIDO
+// Formatar dados para Meta (Advanced Matching) - CORRIGIDO E MELHORADO
 export const formatUserDataForMeta = (userData: PersistedUserData | null) => {
   if (!userData) return {};
   
@@ -151,18 +151,26 @@ export const formatUserDataForMeta = (userData: PersistedUserData | null) => {
   // Separar nome e sobrenome - converter para lowercase
   const nameParts = userData.fullName?.toLowerCase().trim().split(' ') || [];
   const firstName = nameParts[0] || '';
-  const lastName = nameParts.slice(1).join(' ') || '';
+  // CORREÇÃO: Capturar todo o sobrenome independente da quantidade
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+  
+  // Formatar CEP no padrão Facebook (apenas números, já está correto)
+  const zipCode = userData.cep?.replace(/\D/g, '') || '';
+  
+  // Adicionar country padrão Brasil
+  const country = 'br';
   
   return {
     em: userData.email?.toLowerCase().trim(),
     ph: phoneWithCountry,
     fn: firstName,
     ln: lastName,
-    ct: userData.city?.toLowerCase().trim(),
-    st: userData.state?.toLowerCase().trim(),
-    zip: userData.cep?.replace(/\D/g, ''),
+    ct: userData.city?.toLowerCase().trim() || null,
+    st: userData.state?.toLowerCase().trim() || null,
+    zip: zipCode || null,
+    country: country,
     external_id: userData.sessionId,
-    client_ip_address: null, // Será preenchido pelo backend se necessário
+    client_ip_address: null, // EXPLICAÇÃO: null é CORRETO no frontend!
     client_user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null
   };
 };
