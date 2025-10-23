@@ -41,7 +41,8 @@ export async function fireCompliantLead(customParams = {}) {
     const userData = {
       em: await hashData('marconicastro04@gmail.com'),
       ph: await hashData('77998276042'),
-      fn: await hashData('MARCONI AUGUSTO DE CASTRO'),
+      fn: await hashData('marconi'),
+      ln: await hashData('augusto de castro'),
       // Adicionar dados de localização (se disponíveis)
       ct: await hashData('sua_cidade'),     // City hash
       st: await hashData('seu_estado'),     // State hash
@@ -113,7 +114,8 @@ export async function fireCompliantViewContent(customParams = {}) {
     const userData = {
       em: await hashData('marconicastro04@gmail.com'),
       ph: await hashData('77998276042'),
-      fn: await hashData('MARCONI AUGUSTO DE CASTRO')
+      fn: await hashData('marconi'),
+      ln: await hashData('augusto de castro')
     };
     
     const viewContentParams = {
@@ -166,7 +168,8 @@ export async function fireCompliantInitiateCheckout(customParams = {}) {
     const userData = {
       em: await hashData('marconicastro04@gmail.com'),
       ph: await hashData('77998276042'),
-      fn: await hashData('MARCONI AUGUSTO DE CASTRO')
+      fn: await hashData('marconi'),
+      ln: await hashData('augusto de castro')
     };
     
     const checkoutParams = {
@@ -211,7 +214,8 @@ export async function fireCompliantPageView() {
     const userData = {
       em: await hashData('marconicastro04@gmail.com'),
       ph: await hashData('77998276042'),
-      fn: await hashData('MARCONI AUGUSTO DE CASTRO')
+      fn: await hashData('marconi'),
+      ln: await hashData('augusto de castro')
     };
     
     // ✅ PageView PADRÃO Facebook (não personalizado!)
@@ -236,7 +240,8 @@ export async function fireCompliantScrollDepth(percent) {
     const userData = {
       em: await hashData('marconicastro04@gmail.com'),
       ph: await hashData('77998276042'),
-      fn: await hashData('MARCONI AUGUSTO DE CASTRO')
+      fn: await hashData('marconi'),
+      ln: await hashData('augusto de castro')
     };
     
     // ✅ Usa evento padrão com custom_data
