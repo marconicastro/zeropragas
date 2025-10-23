@@ -91,25 +91,14 @@ export default function App() {
       }
     };
 
-    // Adicionar listener apenas uma vez
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Cleanup para remover apenas quando o componente desmontar
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []); // Removido scrollEventsFired das dependências para evitar recriação
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [scrollEventsFired]);
 
-  // useEffect para ViewContent (ÚNICO DISPARO - timing OU scroll)
+  // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
   useEffect(() => {
-    // Se já foi disparado, não faz nada
-    if (viewContentFired) return;
-
-    let viewContentTimer = null;
-    let scrollListenerAdded = false;
-
-    // Função para disparar ViewContent (única)
-    const fireViewContent = async (triggerType, triggerData) => {
+    // Disparar ViewContent após 15 segundos na página (indica interesse real)
+    const viewContentTimer = setTimeout(async () => {
       if (!viewContentFired) {
         await trackMetaEvent('ViewContent', {
           content_name: 'Sistema 4 Fases - Ebook Trips',
@@ -118,48 +107,52 @@ export default function App() {
           currency: 'BRL',
           content_type: 'product',
           custom_data: {
-            trigger_type: triggerType,
-            ...triggerData
+            trigger_type: 'timing',
+            time_on_page: 15
           }
         });
         
         setViewContentFired(true);
-        console.log(`🎯 ViewContent disparado por ${triggerType}`);
-        
-        // Limpar tudo após disparar
-        if (viewContentTimer) clearTimeout(viewContentTimer);
-        if (scrollListenerAdded) {
+        console.log('🎯 ViewContent disparado por timing (15s)');
+      }
+    }, 15000); // 15 segundos
+
+    // Disparar ViewContent ao atingir 25% de scroll (engajamento inicial)
+    const handleScrollForViewContent = async () => {
+      if (!viewContentFired) {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPosition = window.scrollY;
+        const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
+
+        if (scrollPercentage >= 25) {
+          await trackMetaEvent('ViewContent', {
+            content_name: 'Sistema 4 Fases - Ebook Trips',
+            content_ids: ['I101398692S'],
+            value: 39.90,
+            currency: 'BRL',
+            content_type: 'product',
+            custom_data: {
+              trigger_type: 'scroll',
+              scroll_depth: 25
+            }
+          });
+          
+          setViewContentFired(true);
+          console.log('🎯 ViewContent disparado por scroll (25%)');
+          
+          // Remover listener após disparar
           window.removeEventListener('scroll', handleScrollForViewContent);
         }
       }
     };
 
-    // Timer de 15 segundos
-    viewContentTimer = setTimeout(() => {
-      fireViewContent('timing', { time_on_page: 15 });
-    }, 15000);
-
-    // Scroll de 25%
-    const handleScrollForViewContent = async () => {
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const scrollPosition = window.scrollY;
-      const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
-
-      if (scrollPercentage >= 25) {
-        fireViewContent('scroll', { scroll_depth: 25 });
-      }
-    };
-
-    window.addEventListener('scroll', handleScrollForViewContent, { passive: true });
-    scrollListenerAdded = true;
+    window.addEventListener('scroll', handleScrollForViewContent);
 
     return () => {
-      if (viewContentTimer) clearTimeout(viewContentTimer);
-      if (scrollListenerAdded) {
-        window.removeEventListener('scroll', handleScrollForViewContent);
-      }
+      clearTimeout(viewContentTimer);
+      window.removeEventListener('scroll', handleScrollForViewContent);
     };
-  }, []); // Removido viewContentFired das dependências para evitar recriação
+  }, [viewContentFired]);
 
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
@@ -286,24 +279,22 @@ export default function App() {
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Função principal de checkout (REDIRECIONADA PARA O MODAL)
+  // Função principal de checkout (LEGADO - mantida para compatibilidade)
   const handleHotmartCheckout = async (event) => {
-    event.preventDefault(); // Impedir redirecionamento direto
-    
-    // Disparar evento específico de CTA principal
+    // Disparar evento específico de CTA final (não ViewContent para evitar duplicidade)
     await trackMetaEvent('CTAClick', {
-      content_name: 'CTA - Principal',
+      content_name: 'CTA - Final Checkout',
       content_ids: ['I101398692S'],
       value: 39.90,
       currency: 'BRL',
       content_type: 'product',
       custom_data: {
-        cta_type: 'main_cta',
+        cta_type: 'final_checkout_modal',
         action: 'open_modal'
       }
     });
     
-    // Abrir modal de pré-checkout
+    // Redirecionar para o novo fluxo com modal
     openPreCheckoutModal(event);
   };
 
@@ -854,7 +845,9 @@ export default function App() {
 
                 {/* CTA Final - Responsivo */}
                 <a 
-                  href="#" 
+                  href="https://pay.cakto.com.br/hacr962_605077" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
                   id="botao-compra-hotmart" 
                   onClick={handleHotmartCheckout}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 sm:py-8 px-4 sm:px-6 rounded-lg text-xl sm:text-2xl md:text-3xl transform hover:scale-105 transition-all duration-300 shadow-2xl inline-flex items-center justify-center gap-3 sm:gap-4"
