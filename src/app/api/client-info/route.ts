@@ -65,6 +65,7 @@ function isValidIP(ip: string): boolean {
 async function getLocationByIP(ip: string): Promise<Partial<ClientInfo>> {
   try {
     // ip-api.com - gratuito e sem necessidade de API key
+    // Campos extras: region, regionCode, zip para garantir que sejam retornados
     const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query`);
     
     if (!response.ok) {
@@ -79,14 +80,14 @@ async function getLocationByIP(ip: string): Promise<Partial<ClientInfo>> {
     }
     
     // Mapear resposta para nosso formato
-    return {
+    const locationData = {
       ip: data.query,
       city: data.city?.toLowerCase().trim() || null,
       region: data.regionName?.toLowerCase().trim() || null,
-      regionCode: data.regionCode?.toLowerCase() || null,
+      regionCode: data.region?.toLowerCase() || null, // CORREÇÃO: usar 'region' como regionCode
       country: data.country?.toLowerCase() || null,
       countryCode: data.countryCode?.toLowerCase() || null,
-      postalCode: data.zip?.replace(/\D/g, '') || null,
+      postalCode: data.zip?.replace(/\D/g, '') || null, // CORREÇÃO: garantir limpeza do CEP
       timezone: data.timezone,
       isp: data.isp,
       org: data.org,
@@ -94,6 +95,9 @@ async function getLocationByIP(ip: string): Promise<Partial<ClientInfo>> {
       lat: data.lat,
       lon: data.lon
     };
+
+    console.log('📍 Dados mapeados da API:', locationData);
+    return locationData;
     
   } catch (error) {
     console.error('❌ Erro ao obter localização por IP:', error);
@@ -133,8 +137,11 @@ export async function GET(request: Request) {
       ip: clientInfo.ip,
       city: clientInfo.city,
       region: clientInfo.region,
+      regionCode: clientInfo.regionCode,
       country: clientInfo.country,
       postalCode: clientInfo.postalCode,
+      timezone: clientInfo.timezone,
+      isp: clientInfo.isp,
       source: 'api/client-info'
     });
     
