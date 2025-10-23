@@ -31,7 +31,8 @@ async function getHashedUserData() {
   return {
     em: await hashData('marconicastro04@gmail.com'),
     ph: await hashData('77998276042'),
-    fn: await hashData('MARCONI AUGUSTO DE CASTRO'),
+    fn: await hashData('marconi'),
+    ln: await hashData('augusto de castro'),
     // Adicionando localização para aumentar qualidade
     ct: await hashData('sua_cidade'),     // City hash
     st: await hashData('seu_estado'),     // State hash
