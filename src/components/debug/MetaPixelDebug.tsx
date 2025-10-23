@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import { getBestAvailableLocation } from '@/lib/locationData';
 import { getClientIPFromFrontend, IP_EXPLANATION } from '@/lib/ipDetection';
-import { LOCATION_DATA_SOURCES, DEBUG_LOCATION_FLOW } from '@/lib/locationData';
+import { getClientInfo, getEnrichedClientData } from '@/lib/clientInfoService';
 
 const MetaPixelDebug: React.FC = () => {
   const [debugData, setDebugData] = useState<any>({});
   const [locationData, setLocationData] = useState<any>({});
   const [ipData, setIpData] = useState<string | null>(null);
+  const [clientInfo, setClientInfo] = useState<any>({});
+  const [enrichedData, setEnrichedData] = useState<any>({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -22,13 +24,19 @@ const MetaPixelDebug: React.FC = () => {
     try {
       // 1. Dados persistidos
       const persistedData = getPersistedUserData();
-      const formattedData = formatUserDataForMeta(persistedData);
+      const formattedData = formatUserDataForMeta(persistedUserData);
       
-      // 2. Localização
+      // 2. Localização (método antigo)
       const location = await getBestAvailableLocation();
       
-      // 3. IP (frontend)
+      // 3. IP (frontend - limitado)
       const ip = await getClientIPFromFrontend();
+      
+      // 4. Client Info (NOVO - API real)
+      const clientInfoData = await getClientInfo();
+      
+      // 5. Dados Enriquecidos (NOVO - combinação inteligente)
+      const enrichedClientData = await getEnrichedClientData(persistedData);
       
       setDebugData({
         persisted: persistedData,
@@ -37,6 +45,8 @@ const MetaPixelDebug: React.FC = () => {
       
       setLocationData(location);
       setIpData(ip);
+      setClientInfo(clientInfoData);
+      setEnrichedData(enrichedClientData);
       
     } catch (error) {
       console.error('Erro no debug:', error);
@@ -103,7 +113,77 @@ const MetaPixelDebug: React.FC = () => {
         </div>
       </div>
 
-      {/* Seção 5: Explicações */}
+      {/* Seção 5: Client Info API (NOVO) */}
+      <div className="border-l-4 border-yellow-500 pl-4">
+        <h3 className="text-lg font-semibold text-yellow-700">🌐 Client Info API (Real)</h3>
+        <div className="mt-2 p-3 bg-yellow-50 rounded">
+          <p><strong>IP Real:</strong> <span className="font-mono text-green-600">{clientInfo.ip || 'N/A'}</span></p>
+          <p><strong>Cidade:</strong> <span className="font-mono">{clientInfo.city || 'N/A'}</span></p>
+          <p><strong>Estado:</strong> <span className="font-mono">{clientInfo.state || 'N/A'}</span></p>
+          <p><strong>CEP:</strong> <span className="font-mono">{clientInfo.zip || 'N/A'}</span></p>
+          <p><strong>ISP:</strong> <span className="font-mono text-xs">{clientInfo.isp || 'N/A'}</span></p>
+          <pre className="text-xs mt-2 overflow-auto max-h-40">
+            {JSON.stringify(clientInfo, null, 2)}
+          </pre>
+        </div>
+      </div>
+
+      {/* Seção 6: Dados Enriquecidos (NOVO) */}
+      <div className="border-l-4 border-green-600 pl-4">
+        <h3 className="text-lg font-semibold text-green-800">🎯 Dados Enriquecidos (Final)</h3>
+        <div className="mt-2 p-3 bg-green-50 rounded">
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>IP Final:</strong></div>
+            <div className="font-mono text-green-600">{enrichedData.client_ip_address || 'null'}</div>
+            
+            <div><strong>Cidade Final:</strong></div>
+            <div className="font-mono">{enrichedData.ct || 'null'}</div>
+            
+            <div><strong>Estado Final:</strong></div>
+            <div className="font-mono">{enrichedData.st || 'null'}</div>
+            
+            <div><strong>CEP Final:</strong></div>
+            <div className="font-mono">{enrichedData.zip || 'null'}</div>
+            
+            <div><strong>Country:</strong></div>
+            <div className="font-mono">{enrichedData.country || 'br'}</div>
+            
+            <div><strong>Fonte:</strong></div>
+            <div className="font-mono text-xs">{enrichedData.client_info_source || 'unknown'}</div>
+          </div>
+          <pre className="text-xs mt-2 overflow-auto max-h-40">
+            {JSON.stringify(enrichedData, null, 2)}
+          </pre>
+        </div>
+      </div>
+
+      {/* Seção 7: Comparação */}
+      <div className="border-l-4 border-purple-600 pl-4">
+        <h3 className="text-lg font-semibold text-purple-800">📊 Comparação: Antes vs Depois</h3>
+        <div className="mt-2 p-3 bg-purple-50 rounded">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="font-semibold">Parâmetro</div>
+            <div className="font-semibold">Antes</div>
+            <div className="font-semibold">Depois (Enriquecido)</div>
+            
+            <div>client_ip_address:</div>
+            <div className="text-red-600">null</div>
+            <div className="text-green-600 font-mono">{enrichedData.client_ip_address || 'null'}</div>
+            
+            <div>ct (city):</div>
+            <div className="text-red-600">{debugData.formatted?.ct || 'null'}</div>
+            <div className="text-green-600 font-mono">{enrichedData.ct || 'null'}</div>
+            
+            <div>st (state):</div>
+            <div className="text-red-600">{debugData.formatted?.st || 'null'}</div>
+            <div className="text-green-600 font-mono">{enrichedData.st || 'null'}</div>
+            
+            <div>zip:</div>
+            <div className="text-red-600">{debugData.formatted?.zip || 'null'}</div>
+            <div className="text-green-600 font-mono">{enrichedData.zip || 'null'}</div>
+          </div>
+        </div>
+      </div>
       <div className="border-l-4 border-indigo-500 pl-4">
         <h3 className="text-lg font-semibold text-indigo-700">📚 Explicações Importantes</h3>
         
