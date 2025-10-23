@@ -156,12 +156,11 @@ export const formatUserDataForMeta = (userData: PersistedUserData | null) => {
   return {
     em: userData.email?.toLowerCase().trim(),
     ph: phoneWithCountry,
-    fn: firstName.toLowerCase(), // Facebook padrão: minúsculas
-    ln: lastName.toLowerCase(),  // Facebook padrão: minúsculas
-    ct: userData.city?.toLowerCase().trim(), // Facebook padrão: minúsculas
-    st: userData.state?.toLowerCase().trim(), // Facebook padrão: minúsculas
-    country: userData.country?.toLowerCase().trim(), // Facebook padrão: minúsculas
-    zip: userData.cep, // Manter formatação original do CEP (com hífen)
+    fn: firstName,
+    ln: lastName,
+    ct: userData.city?.toLowerCase().trim(),
+    st: userData.state?.toLowerCase().trim(),
+    zip: userData.cep?.replace(/\D/g, ''),
     external_id: userData.sessionId,
     client_ip_address: null, // Será preenchido pelo backend se necessário
     client_user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null
