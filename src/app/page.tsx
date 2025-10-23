@@ -95,10 +95,16 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrollEventsFired]);
 
-  // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
+  // useEffect para ViewContent (ÚNICO DISPARO - timing OU scroll)
   useEffect(() => {
-    // Disparar ViewContent após 15 segundos na página (indica interesse real)
-    const viewContentTimer = setTimeout(async () => {
+    // Se já foi disparado, não faz nada
+    if (viewContentFired) return;
+
+    let viewContentTimer = null;
+    let scrollListenerAdded = false;
+
+    // Função para disparar ViewContent (única)
+    const fireViewContent = async (triggerType, triggerData) => {
       if (!viewContentFired) {
         await trackMetaEvent('ViewContent', {
           content_name: 'Sistema 4 Fases - Ebook Trips',
@@ -107,50 +113,46 @@ export default function App() {
           currency: 'BRL',
           content_type: 'product',
           custom_data: {
-            trigger_type: 'timing',
-            time_on_page: 15
+            trigger_type: triggerType,
+            ...triggerData
           }
         });
         
         setViewContentFired(true);
-        console.log('🎯 ViewContent disparado por timing (15s)');
-      }
-    }, 15000); // 15 segundos
-
-    // Disparar ViewContent ao atingir 25% de scroll (engajamento inicial)
-    const handleScrollForViewContent = async () => {
-      if (!viewContentFired) {
-        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPosition = window.scrollY;
-        const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
-
-        if (scrollPercentage >= 25) {
-          await trackMetaEvent('ViewContent', {
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['I101398692S'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            custom_data: {
-              trigger_type: 'scroll',
-              scroll_depth: 25
-            }
-          });
-          
-          setViewContentFired(true);
-          console.log('🎯 ViewContent disparado por scroll (25%)');
-          
-          // Remover listener após disparar
+        console.log(`🎯 ViewContent disparado por ${triggerType}`);
+        
+        // Limpar tudo após disparar
+        if (viewContentTimer) clearTimeout(viewContentTimer);
+        if (scrollListenerAdded) {
           window.removeEventListener('scroll', handleScrollForViewContent);
         }
       }
     };
 
+    // Timer de 15 segundos
+    viewContentTimer = setTimeout(() => {
+      fireViewContent('timing', { time_on_page: 15 });
+    }, 15000);
+
+    // Scroll de 25%
+    const handleScrollForViewContent = async () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollPosition = window.scrollY;
+      const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
+
+      if (scrollPercentage >= 25) {
+        fireViewContent('scroll', { scroll_depth: 25 });
+      }
+    };
+
     window.addEventListener('scroll', handleScrollForViewContent);
+    scrollListenerAdded = true;
 
     return () => {
-      clearTimeout(viewContentTimer);
-      window.removeEventListener('scroll', handleScrollForViewContent);
+      if (viewContentTimer) clearTimeout(viewContentTimer);
+      if (scrollListenerAdded) {
+        window.removeEventListener('scroll', handleScrollForViewContent);
+      }
     };
   }, [viewContentFired]);
 
