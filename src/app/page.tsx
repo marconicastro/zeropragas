@@ -8,6 +8,7 @@ import OptimizedImage from '@/components/OptimizedImage';
 import { trackMetaEvent } from '@/components/MetaPixel';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import DebugPersistence from '@/components/DebugPersistence';
+import { useEventControl } from '@/hooks/useEventControl.js';
 
 export default function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -19,14 +20,8 @@ export default function App() {
   // Estado para controlar o modal de pré-checkout
   const [isPreCheckoutModalOpen, setIsPreCheckoutModalOpen] = useState(false);
 
-  // Estado para controlar eventos de scroll já disparados
-  const [scrollEventsFired, setScrollEventsFired] = useState({
-    '50': false,
-    '75': false
-  });
-
-  // Estado para controle de ViewContent (EVITAR DUPLICIDADE)
-  const [viewContentFired, setViewContentFired] = useState(false);
+  // Sistema de controle centralizado de eventos (SUBSTITUI ESTADOS ANTIGOS)
+  const { checkEventStatus } = useEventControl();
 
   // Estado para dados do usuário (agora com persistência)
   const [userData, setUserData] = useState<{
@@ -71,88 +66,11 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // useEffect para rastreamento de scroll
-  useEffect(() => {
-    const handleScroll = async () => {
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const scrollPosition = window.scrollY;
-      const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
+  // useEffect para scroll e ViewContent foi substituído pelo controle centralizado
+  // O novo sistema garante: ViewContent (1x) e ScrollDepth (50%, 75%, 90%)
 
-      // Disparar evento de 50% do scroll
-      if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
-        await trackMetaEvent('ScrollDepth', { percent: 50 });
-        setScrollEventsFired(prev => ({ ...prev, '50': true }));
-      }
-
-      // Disparar evento de 75% do scroll
-      if (scrollPercentage >= 75 && !scrollEventsFired['75']) {
-        await trackMetaEvent('ScrollDepth', { percent: 75 });
-        setScrollEventsFired(prev => ({ ...prev, '75': true }));
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [scrollEventsFired]);
-
-  // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
-  useEffect(() => {
-    // Disparar ViewContent após 15 segundos na página (indica interesse real)
-    const viewContentTimer = setTimeout(async () => {
-      if (!viewContentFired) {
-        await trackMetaEvent('ViewContent', {
-          content_name: 'Sistema 4 Fases - Ebook Trips',
-          content_ids: ['I101398692S'],
-          value: 39.90,
-          currency: 'BRL',
-          content_type: 'product',
-          custom_data: {
-            trigger_type: 'timing',
-            time_on_page: 15
-          }
-        });
-        
-        setViewContentFired(true);
-        console.log('🎯 ViewContent disparado por timing (15s)');
-      }
-    }, 15000); // 15 segundos
-
-    // Disparar ViewContent ao atingir 25% de scroll (engajamento inicial)
-    const handleScrollForViewContent = async () => {
-      if (!viewContentFired) {
-        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPosition = window.scrollY;
-        const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
-
-        if (scrollPercentage >= 25) {
-          await trackMetaEvent('ViewContent', {
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['I101398692S'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            custom_data: {
-              trigger_type: 'scroll',
-              scroll_depth: 25
-            }
-          });
-          
-          setViewContentFired(true);
-          console.log('🎯 ViewContent disparado por scroll (25%)');
-          
-          // Remover listener após disparar
-          window.removeEventListener('scroll', handleScrollForViewContent);
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScrollForViewContent);
-
-    return () => {
-      clearTimeout(viewContentTimer);
-      window.removeEventListener('scroll', handleScrollForViewContent);
-    };
-  }, [viewContentFired]);
+  // O controle centralizado de eventos já gerencia ViewContent e ScrollDepth
+  // Não há necessidade de useEffect adicionais aqui
 
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
@@ -844,17 +762,14 @@ export default function App() {
                 </div>
 
                 {/* CTA Final - Responsivo */}
-                <a 
-                  href="https://pay.cakto.com.br/hacr962_605077" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <button 
                   id="botao-compra-hotmart" 
                   onClick={handleHotmartCheckout}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 sm:py-8 px-4 sm:px-6 rounded-lg text-xl sm:text-2xl md:text-3xl transform hover:scale-105 transition-all duration-300 shadow-2xl inline-flex items-center justify-center gap-3 sm:gap-4"
                 >
                   <DollarSign className="w-6 h-6 sm:w-8 sm:h-8" />
                   COMPRAR AGORA
-                </a>
+                </button>
 
                 <div className="text-center text-xs sm:text-sm text-gray-600 mt-3 sm:mt-4 space-y-1">
                   <p>🔒 Compra 100% segura e protegida</p>
@@ -969,6 +884,38 @@ export default function App() {
 
       {/* Componente de Debug (apenas desenvolvimento) */}
       {process.env.NODE_ENV === 'development' && <DebugPersistence />}
+      
+      {/* Painel de Teste de Eventos (apenas desenvolvimento) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-black text-white p-4 rounded-lg shadow-lg text-xs max-w-sm z-50">
+          <div className="font-bold mb-2">🧪 Teste de Eventos</div>
+          <div className="mb-2">
+            <button 
+              onClick={() => {
+                console.log('🔍 Status dos eventos:', checkEventStatus());
+              }}
+              className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-xs mr-2"
+            >
+              Ver Status
+            </button>
+            <button 
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.debugEventController) {
+                  window.debugEventController();
+                }
+              }}
+              className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded text-xs"
+            >
+              Debug
+            </button>
+          </div>
+          <div className="text-gray-300 text-xs">
+            <div className="mb-1">✅ ViewContent: 1 disparo</div>
+            <div className="mb-1">✅ ScrollDepth: 3 disparos</div>
+            <div>Ctrl+Shift+E para painel completo</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
