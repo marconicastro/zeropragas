@@ -133,17 +133,34 @@ export const updatePersistedData = (updates: Partial<PersistedUserData>): void =
   }
 };
 
-// Formatar dados para Meta (Advanced Matching)
+// Formatar dados para Meta (Advanced Matching) - CORRIGIDO
 export const formatUserDataForMeta = (userData: PersistedUserData | null) => {
   if (!userData) return {};
   
+  // Formatar telefone - Adicionar código do país (55)
+  const phoneClean = userData.phone?.replace(/\D/g, '') || '';
+  let phoneWithCountry = phoneClean;
+  
+  // Se não tiver código do país, adicionar 55
+  if (phoneClean.length === 10) {
+    phoneWithCountry = `55${phoneClean}`;
+  } else if (phoneClean.length === 11) {
+    phoneWithCountry = `55${phoneClean}`;
+  }
+  
+  // Separar nome e sobrenome - converter para lowercase
+  const nameParts = userData.fullName?.toLowerCase().trim().split(' ') || [];
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  
   return {
-    em: userData.email,
-    ph: userData.phone,
-    fn: userData.fullName,
-    ct: userData.city,
-    st: userData.state,
-    zip: userData.cep,
+    em: userData.email?.toLowerCase().trim(),
+    ph: phoneWithCountry,
+    fn: firstName,
+    ln: lastName,
+    ct: userData.city?.toLowerCase().trim(),
+    st: userData.state?.toLowerCase().trim(),
+    zip: userData.cep?.replace(/\D/g, ''),
     external_id: userData.sessionId,
     client_ip_address: null, // Será preenchido pelo backend se necessário
     client_user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null

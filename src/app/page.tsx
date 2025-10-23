@@ -73,20 +73,20 @@ export default function App() {
 
   // useEffect para rastreamento de scroll
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = async () => {
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
       const scrollPosition = window.scrollY;
       const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
 
       // Disparar evento de 50% do scroll
       if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
-        trackMetaEvent('ScrollDepth', { percent: 50 });
+        await trackMetaEvent('ScrollDepth', { percent: 50 });
         setScrollEventsFired(prev => ({ ...prev, '50': true }));
       }
 
       // Disparar evento de 75% do scroll
       if (scrollPercentage >= 75 && !scrollEventsFired['75']) {
-        trackMetaEvent('ScrollDepth', { percent: 75 });
+        await trackMetaEvent('ScrollDepth', { percent: 75 });
         setScrollEventsFired(prev => ({ ...prev, '75': true }));
       }
     };
@@ -98,9 +98,9 @@ export default function App() {
   // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
   useEffect(() => {
     // Disparar ViewContent após 15 segundos na página (indica interesse real)
-    const viewContentTimer = setTimeout(() => {
+    const viewContentTimer = setTimeout(async () => {
       if (!viewContentFired) {
-        trackMetaEvent('ViewContent', {
+        await trackMetaEvent('ViewContent', {
           content_name: 'Sistema 4 Fases - Ebook Trips',
           content_ids: ['I101398692S'],
           value: 39.90,
@@ -118,14 +118,14 @@ export default function App() {
     }, 15000); // 15 segundos
 
     // Disparar ViewContent ao atingir 25% de scroll (engajamento inicial)
-    const handleScrollForViewContent = () => {
+    const handleScrollForViewContent = async () => {
       if (!viewContentFired) {
         const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
         const scrollPosition = window.scrollY;
         const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
 
         if (scrollPercentage >= 25) {
-          trackMetaEvent('ViewContent', {
+          await trackMetaEvent('ViewContent', {
             content_name: 'Sistema 4 Fases - Ebook Trips',
             content_ids: ['I101398692S'],
             value: 39.90,
@@ -221,10 +221,10 @@ export default function App() {
     }
 
     // Disparar evento Lead (agora no momento correto - após preenchimento)
-    trackMetaEvent('Lead', {
+    await trackMetaEvent('Lead', {
       content_name: 'Lead - Formulário Preenchido',
       content_category: 'Formulário',
-      value: 0.0,
+      value: 15.00,  // CORRIGIDO: Valor realista para lead
       currency: 'BRL',
       user_data: {
         em: formData.email,
@@ -234,7 +234,7 @@ export default function App() {
     });
 
     // Disparar evento InitiateCheckout com Advanced Matching Enriquecido
-    trackMetaEvent('InitiateCheckout', {
+    await trackMetaEvent('InitiateCheckout', {
       value: 39.90,
       currency: 'BRL',
       content_name: 'Sistema 4 Fases - Ebook Trips',
@@ -262,9 +262,9 @@ export default function App() {
     window.location.href = finalUrlString;
   };
 
-  const scrollToCheckout = () => {
+  const scrollToCheckout = async () => {
     // Disparar evento específico de CTA (não ViewContent para evitar duplicidade)
-    trackMetaEvent('CTAClick', {
+    await trackMetaEvent('CTAClick', {
       content_name: 'CTA - Quero Economizar',
       content_ids: ['I101398692S'],
       value: 39.90,
@@ -280,9 +280,9 @@ export default function App() {
   };
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
-  const handleHotmartCheckout = (event) => {
+  const handleHotmartCheckout = async (event) => {
     // Disparar evento específico de CTA final (não ViewContent para evitar duplicidade)
-    trackMetaEvent('CTAClick', {
+    await trackMetaEvent('CTAClick', {
       content_name: 'CTA - Final Checkout',
       content_ids: ['I101398692S'],
       value: 39.90,
