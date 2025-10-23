@@ -37,6 +37,29 @@ async function hashData(data: string | null): Promise<string | null> {
   }
 }
 
+// Função para obter dados do cliente (IP, localização, etc)
+const getClientData = async () => {
+  try {
+    const response = await fetch('/api/client-info');
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.warn('Erro ao obter dados do cliente:', error);
+  }
+  
+  // Retornar dados básicos em caso de erro
+  return {
+    client_ip_address: null,
+    client_user_agent: navigator.userAgent,
+    city: null,
+    region: null,
+    country: null,
+    countryName: null,
+    zip: null
+  };
+};
+
 // Função auxiliar para rastreamento de eventos Meta COM PERSISTÊNCIA E HASH
 export const trackMetaEvent = async (eventName: string, parameters?: object) => {
   if (typeof window !== 'undefined' && window.fbq) {
@@ -44,18 +67,33 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
     const persistedUserData = getPersistedUserData();
     const formattedUserData = formatUserDataForMeta(persistedUserData);
     
+    // Obter dados do cliente em tempo real
+    const clientData = await getClientData();
+    
+    // Combinar dados formatados com dados do cliente
+    const enrichedUserData = {
+      ...formattedUserData,
+      ct: clientData.city || formattedUserData.ct,
+      st: clientData.region || formattedUserData.st,
+      country: clientData.country || formattedUserData.country, // Adicionando country
+      zip: clientData.zip || formattedUserData.zip,
+      client_ip_address: clientData.client_ip_address,
+      client_user_agent: clientData.client_user_agent
+    };
+    
     // HASH DE TODOS OS DADOS PII (Informações Pessoais Identificáveis)
     const hashedUserData = {
-      em: await hashData(formattedUserData.em),
-      ph: await hashData(formattedUserData.ph),
-      fn: await hashData(formattedUserData.fn),
-      ln: await hashData(formattedUserData.ln),
-      ct: await hashData(formattedUserData.ct),
-      st: await hashData(formattedUserData.st),
-      zip: await hashData(formattedUserData.zip),
-      external_id: formattedUserData.external_id, // Não hashear external_id
-      client_ip_address: formattedUserData.client_ip_address,
-      client_user_agent: formattedUserData.client_user_agent
+      em: await hashData(enrichedUserData.em),
+      ph: await hashData(enrichedUserData.ph),
+      fn: await hashData(enrichedUserData.fn),
+      ln: await hashData(enrichedUserData.ln),
+      ct: await hashData(enrichedUserData.ct),
+      st: await hashData(enrichedUserData.st),
+      country: await hashData(enrichedUserData.country), // Adicionando country
+      zip: await hashData(enrichedUserData.zip),
+      external_id: enrichedUserData.external_id, // Não hashear external_id
+      client_ip_address: enrichedUserData.client_ip_address,
+      client_user_agent: enrichedUserData.client_user_agent
     };
     
     // Enriquecer parâmetros com dados hasheados
@@ -83,7 +121,23 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
     console.log('🎯 Meta Event ENRIQUECIDO E HASHEADO:', eventName, {
       hasUserData: !!persistedUserData,
       userDataFields: Object.keys(formattedUserData),
+      clientDataFields: Object.keys(clientData).filter(key => clientData[key as keyof typeof clientData]),
+      enrichedFields: Object.keys(enrichedUserData).filter(key => enrichedUserData[key as keyof typeof enrichedUserData]),
       hashedFields: Object.keys(hashedUserData).filter(key => hashedUserData[key as keyof typeof hashedUserData]),
+      location: {
+        city: clientData.city,
+        region: clientData.region,
+        country: clientData.country,
+        countryName: clientData.countryName,
+        zip: clientData.zip,
+        ip: clientData.client_ip_address,
+        formatted: {
+          city: clientData.city?.toLowerCase(),
+          region: clientData.region?.toLowerCase(), 
+          country: clientData.country?.toLowerCase(),
+          zip: clientData.zip // Mantém formatação original
+        }
+      },
       params: enhancedParams
     });
     
@@ -144,18 +198,33 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
         // Disparar PageView JÁ ENRIQUECIDO com dados persistidos E HASHEADOS
         const formattedUserData = formatUserDataForMeta(persistedUserData);
         
+        // Obter dados do cliente em tempo real
+        const clientData = await getClientData();
+        
+        // Combinar dados formatados com dados do cliente
+        const enrichedUserData = {
+          ...formattedUserData,
+          ct: clientData.city || formattedUserData.ct,
+          st: clientData.region || formattedUserData.st,
+          country: clientData.country || formattedUserData.country, // Adicionando country
+          zip: clientData.zip || formattedUserData.zip,
+          client_ip_address: clientData.client_ip_address,
+          client_user_agent: clientData.client_user_agent
+        };
+        
         // HASH dos dados para PageView
         const hashedUserData = {
-          em: await hashData(formattedUserData.em),
-          ph: await hashData(formattedUserData.ph),
-          fn: await hashData(formattedUserData.fn),
-          ln: await hashData(formattedUserData.ln),
-          ct: await hashData(formattedUserData.ct),
-          st: await hashData(formattedUserData.st),
-          zip: await hashData(formattedUserData.zip),
-          external_id: formattedUserData.external_id,
-          client_ip_address: formattedUserData.client_ip_address,
-          client_user_agent: formattedUserData.client_user_agent
+          em: await hashData(enrichedUserData.em),
+          ph: await hashData(enrichedUserData.ph),
+          fn: await hashData(enrichedUserData.fn),
+          ln: await hashData(enrichedUserData.ln),
+          ct: await hashData(enrichedUserData.ct),
+          st: await hashData(enrichedUserData.st),
+          country: await hashData(enrichedUserData.country), // Adicionando country
+          zip: await hashData(enrichedUserData.zip),
+          external_id: enrichedUserData.external_id,
+          client_ip_address: enrichedUserData.client_ip_address,
+          client_user_agent: enrichedUserData.client_user_agent
         };
       
       const pageViewParams: any = {
@@ -178,7 +247,23 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
       console.log('🚀 PageView ENRIQUECIDO E HASHEADO:', {
         hasUserData: !!persistedUserData,
         userDataFields: Object.keys(formattedUserData),
+        clientDataFields: Object.keys(clientData).filter(key => clientData[key as keyof typeof clientData]),
+        enrichedFields: Object.keys(enrichedUserData).filter(key => enrichedUserData[key as keyof typeof enrichedUserData]),
         hashedFields: Object.keys(hashedUserData).filter(key => hashedUserData[key as keyof typeof hashedUserData]),
+        location: {
+          city: clientData.city,
+          region: clientData.region,
+          country: clientData.country,
+          countryName: clientData.countryName,
+          zip: clientData.zip,
+          ip: clientData.client_ip_address,
+          formatted: {
+            city: clientData.city?.toLowerCase(),
+            region: clientData.region?.toLowerCase(), 
+            country: clientData.country?.toLowerCase(),
+            zip: clientData.zip // Mantém formatação original
+          }
+        },
         params: pageViewParams
       });
       
