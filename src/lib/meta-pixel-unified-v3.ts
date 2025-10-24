@@ -232,7 +232,7 @@ export async function fireUnifiedViewContentV3(customParams: any = {}) {
   return fireEventWithDeduplication('ViewContent', {
     value: 39.9,
     currency: 'BRL',
-    content_ids: ['I101398692S'],
+    content_ids: ['339591'],
     content_type: 'product',
     content_name: 'Sistema 4 Fases - Ebook Trips',
     content_category: 'digital_product',
@@ -316,7 +316,7 @@ export async function fireUnifiedInitiateCheckoutV3(customParams: any = {}) {
   return fireEventWithDeduplication('InitiateCheckout', {
     value: 39.9,
     currency: 'BRL',
-    content_ids: ['I101398692S'],
+    content_ids: ['339591'],
     content_type: 'product',
     content_name: 'Sistema 4 Fases - Ebook Trips',
     content_category: 'digital_product',
