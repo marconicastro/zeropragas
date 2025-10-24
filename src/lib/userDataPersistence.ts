@@ -47,7 +47,7 @@ const cleanExpiredData = (): void => {
   }
 };
 
-// Salvar dados do usuário com persistência
+// Salvar dados do usuário com persistência (MANTENDO SESSÃO UNIFICADA)
 export const saveUserData = (userData: {
   email?: string;
   phone?: string;
@@ -59,15 +59,21 @@ export const saveUserData = (userData: {
   try {
     cleanExpiredData(); // Limpar dados expirados primeiro
     
+    // Obter sessão unificada (não gerar nova)
+    const currentSessionId = getSessionId();
+    
     const persistedData: PersistedUserData = {
       ...userData,
       timestamp: Date.now(),
-      sessionId: getSessionId(),
+      sessionId: currentSessionId, // Usar sessão existente
       consent
     };
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedData));
-    console.log('💾 Dados do usuário salvos com sucesso:', persistedData);
+    console.log('💾 Dados do usuário salvos com sessão mantida:', {
+      ...persistedData,
+      sessionId: currentSessionId
+    });
   } catch (error) {
     console.warn('⚠️ Erro ao salvar dados do usuário:', error);
   }
@@ -93,14 +99,44 @@ export const getPersistedUserData = (): PersistedUserData | null => {
   }
 };
 
-// Obter ou gerar ID de sessão
+// Obter ou gerar ID de sessão UNIFICADO e PERSISTENTE
 export const getSessionId = (): string => {
   let sessionId = sessionStorage.getItem(SESSION_KEY);
+  
   if (!sessionId) {
-    sessionId = generateSessionId();
+    // Tentar recuperar do localStorage primeiro (para unificar sessões)
+    const storedSessionId = localStorage.getItem('zc_persistent_session');
+    if (storedSessionId) {
+      sessionId = storedSessionId;
+      console.log('🔄 Sessão recuperada do localStorage:', sessionId);
+    } else {
+      // Gerar nova sessão apenas se não existir em nenhum lugar
+      sessionId = generateSessionId();
+      console.log('🆕 Nova sessão gerada:', sessionId);
+    }
+    
+    // Armazenar em ambos os lugares para persistência
     sessionStorage.setItem(SESSION_KEY, sessionId);
+    localStorage.setItem('zc_persistent_session', sessionId);
   }
+  
   return sessionId;
+};
+
+// Forçar atualização da sessão (usado após formulário)
+export const updateSessionId = (): string => {
+  const newSessionId = generateSessionId();
+  sessionStorage.setItem(SESSION_KEY, newSessionId);
+  localStorage.setItem('zc_persistent_session', newSessionId);
+  console.log('🔄 Sessão atualizada:', newSessionId);
+  return newSessionId;
+};
+
+// Verificar se a sessão atual é diferente da persistida
+export const hasSessionChanged = (): boolean => {
+  const currentSession = sessionStorage.getItem(SESSION_KEY);
+  const persistedSession = localStorage.getItem('zc_persistent_session');
+  return currentSession !== persistedSession;
 };
 
 // Limpar todos os dados (logout/opt-out)

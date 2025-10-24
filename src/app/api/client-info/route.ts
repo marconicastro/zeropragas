@@ -61,7 +61,7 @@ function isValidIP(ip: string): boolean {
   return ipv6Regex.test(ip);
 }
 
-// API de geolocalização via ip-api.com
+// API de geolocalização via ip-api.com (principal)
 async function getLocationByIP(ip: string): Promise<Partial<ClientInfo>> {
   try {
     // ip-api.com - gratuito e sem necessidade de API key
@@ -74,12 +74,12 @@ async function getLocationByIP(ip: string): Promise<Partial<ClientInfo>> {
     const data = await response.json();
     
     if (data.status === 'fail') {
-      console.warn('❌ Falha na API de geolocalização:', data.message);
-      return {};
+      console.warn('❌ Falha na API principal (ip-api.com):', data.message);
+      return await getLocationByIPBackup1(ip);
     }
     
     // Mapear resposta para nosso formato
-    return {
+    const locationData = {
       ip: data.query,
       city: data.city?.toLowerCase().trim() || null,
       region: data.regionName?.toLowerCase().trim() || null,
@@ -95,10 +95,190 @@ async function getLocationByIP(ip: string): Promise<Partial<ClientInfo>> {
       lon: data.lon
     };
     
+    // Se dados críticos faltarem, tentar API backup para completar
+    if (!locationData.region || !locationData.postalCode) {
+      console.log('🔄 Dados incompletos na API principal (region/zip), tentando backup...');
+      const backupData = await getLocationByIPBackup1(ip);
+      
+      // Complementar apenas os dados faltantes
+      return {
+        ...locationData,
+        region: locationData.region || backupData.region,
+        postalCode: locationData.postalCode || backupData.postalCode,
+        city: locationData.city || backupData.city
+      };
+    }
+    
+    console.log('✅ API principal funcionou com dados completos');
+    return locationData;
+    
   } catch (error) {
-    console.error('❌ Erro ao obter localização por IP:', error);
-    return {};
+    console.error('❌ Erro na API principal:', error);
+    return await getLocationByIPBackup1(ip);
   }
+}
+
+// API Backup 1: ipgeolocation.io (gratuito)
+async function getLocationByIPBackup1(ip: string): Promise<Partial<ClientInfo>> {
+  try {
+    console.log('🔄 Tentando API Backup 1 (ipgeolocation.io)...');
+    
+    const response = await fetch(`https://api.ipgeolocation.io/ipgeo?apiKey=free&ip=${ip}&fields=country_code2,country_name,state_prov,city,zipcode,latitude,longitude,time_zone,isp,organization`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    const locationData = {
+      ip: ip,
+      city: data.city?.toLowerCase().trim() || null,
+      region: data.state_prov?.toLowerCase().trim() || null,
+      regionCode: data.state_prov?.toLowerCase().trim() || null,
+      country: data.country_name?.toLowerCase() || null,
+      countryCode: data.country_code2?.toLowerCase() || null,
+      postalCode: data.zipcode?.replace(/\D/g, '') || null,
+      timezone: data.time_zone?.name,
+      isp: data.isp,
+      org: data.organization,
+      lat: data.latitude,
+      lon: data.longitude
+    };
+    
+    // Se ainda faltar dados críticos, tentar próxima API
+    if (!locationData.region || !locationData.postalCode) {
+      console.log('🔄 Dados ainda incompletos no Backup 1, tentando Backup 2...');
+      const backupData = await getLocationByIPBackup2(ip);
+      
+      return {
+        ...locationData,
+        region: locationData.region || backupData.region,
+        postalCode: locationData.postalCode || backupData.postalCode,
+        city: locationData.city || backupData.city
+      };
+    }
+    
+    console.log('✅ API Backup 1 funcionou');
+    return locationData;
+    
+  } catch (error) {
+    console.error('❌ Erro na API Backup 1:', error);
+    return await getLocationByIPBackup2(ip);
+  }
+}
+
+// API Backup 2: ipapi.co (gratuito)
+async function getLocationByIPBackup2(ip: string): Promise<Partial<ClientInfo>> {
+  try {
+    console.log('🔄 Tentando API Backup 2 (ipapi.co)...');
+    
+    const response = await fetch(`https://ipapi.co/${ip}/json/`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    const locationData = {
+      ip: ip,
+      city: data.city?.toLowerCase().trim() || null,
+      region: data.region?.toLowerCase().trim() || null,
+      regionCode: data.region_code?.toLowerCase() || null,
+      country: data.country_name?.toLowerCase() || null,
+      countryCode: data.country_code?.toLowerCase() || null,
+      postalCode: data.postal?.replace(/\D/g, '') || null,
+      timezone: data.timezone,
+      isp: data.org,
+      org: data.org,
+      lat: data.latitude,
+      lon: data.longitude
+    };
+    
+    // Se ainda faltar dados, tentar última API
+    if (!locationData.region || !locationData.postalCode) {
+      console.log('🔄 Dados ainda incompletos no Backup 2, tentando Backup 3...');
+      const backupData = await getLocationByIPBackup3(ip);
+      
+      return {
+        ...locationData,
+        region: locationData.region || backupData.region,
+        postalCode: locationData.postalCode || backupData.postalCode,
+        city: locationData.city || backupData.city
+      };
+    }
+    
+    console.log('✅ API Backup 2 funcionou');
+    return locationData;
+    
+  } catch (error) {
+    console.error('❌ Erro na API Backup 2:', error);
+    return await getLocationByIPBackup3(ip);
+  }
+}
+
+// API Backup 3: ip-api.com (endpoint alternativo)
+async function getLocationByIPBackup3(ip: string): Promise<Partial<ClientInfo>> {
+  try {
+    console.log('🔄 Tentando API Backup 3 (ip-api.com alternativo)...');
+    
+    const response = await fetch(`http://ip-api.com/json/${ip}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.status === 'fail') {
+      console.warn('❌ Todas as APIs falharam, usando dados padrão Brasil');
+      return getDefaultBrazilData(ip);
+    }
+    
+    const locationData = {
+      ip: ip,
+      city: data.city?.toLowerCase().trim() || null,
+      region: data.regionName?.toLowerCase().trim() || null,
+      regionCode: data.regionCode?.toLowerCase() || null,
+      country: data.country?.toLowerCase() || null,
+      countryCode: data.countryCode?.toLowerCase() || null,
+      postalCode: data.zip?.replace(/\D/g, '') || null,
+      timezone: data.timezone,
+      isp: data.isp,
+      org: data.org,
+      as: data.as,
+      lat: data.lat,
+      lon: data.lon
+    };
+    
+    console.log('✅ API Backup 3 funcionou');
+    return locationData;
+    
+  } catch (error) {
+    console.error('❌ Erro na API Backup 3:', error);
+    return getDefaultBrazilData(ip);
+  }
+}
+
+// Dados padrão Brasil (último recurso)
+function getDefaultBrazilData(ip: string): Partial<ClientInfo> {
+  console.log('🇧🇷 Usando dados padrão Brasil (último recurso)');
+  
+  return {
+    ip: ip,
+    city: null,
+    region: null,
+    regionCode: null,
+    country: 'brasil',
+    countryCode: 'br',
+    postalCode: null,
+    timezone: 'America/Sao_Paulo',
+    isp: null,
+    org: null,
+    lat: -14.235,
+    lon: -51.925
+  };
 }
 
 // API endpoint principal
@@ -108,7 +288,7 @@ export async function GET(request: Request) {
     const clientIP = getClientIP(request);
     console.log('🌐 IP do cliente detectado:', clientIP);
     
-    // 2. Obter informações de geolocalização
+    // 2. Obter informações de geolocalização com múltiplos backups
     const locationData = await getLocationByIP(clientIP);
     
     // 3. Combinar dados

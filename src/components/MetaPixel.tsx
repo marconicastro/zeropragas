@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { initializePersistence, formatUserDataForMeta, getPersistedUserData } from '@/lib/userDataPersistence';
 import { formatEnrichedDataForMeta, getEnrichedUserData } from '@/lib/enrichedUserData';
 import { getEnrichedClientData } from '@/lib/clientInfoService';
+import { getCurrentTimestamp } from '@/lib/timestampUtils';
 
 // Declaração global para tipagem do fbq
 declare global {
@@ -67,7 +68,7 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         client_info_source: enrichedClientData.client_info_source
       };
       
-      // 5. HASH DE TODOS OS DADOS PII (Informações Pessoais Identificáveis)
+      // 5. HASH DE TODOS OS DADOS PII (Informações Pessoais Identificáveis) - sem user agent redundante
       const hashedUserData = {
         em: await hashData(finalUserData.em),
         ph: await hashData(finalUserData.ph),
@@ -79,7 +80,6 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         country: await hashData(finalUserData.country),
         external_id: finalUserData.external_id, // Não hashear external_id
         client_ip_address: finalUserData.client_ip_address, // IP não hashear
-        client_user_agent: finalUserData.client_user_agent,
         client_timezone: finalUserData.client_timezone,
         client_isp: finalUserData.client_isp,
         client_info_source: finalUserData.client_info_source
@@ -92,10 +92,9 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         ...(Object.keys(hashedUserData).length > 0 && { 
           user_data: hashedUserData 
         }),
-        // Metadata para CAPI Gateway
+        // Metadata para CAPI Gateway (removendo client_user_agent redundante)
         event_source_url: window.location.href,
-        client_user_agent: navigator.userAgent,
-        event_time: Math.floor(Date.now() / 1000),
+        event_time: getCurrentTimestamp(),
         // Informações de sessão
         ...(persistedUserData?.sessionId && { 
           session_id: persistedUserData.sessionId 
@@ -106,8 +105,8 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         data_hashed: true,
         // Flag para indicar dados enriquecidos
         data_enriched: true,
-        // Metadados de qualidade
-        enrichment_timestamp: Date.now()
+        // Metadados de qualidade (padronizado para segundos)
+        enrichment_timestamp: getCurrentTimestamp()
       };
 
       // Log detalhado para debug (remover em produção)
@@ -141,8 +140,8 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         zip: await hashData(formattedUserData.zip),
         country: await hashData(formattedUserData.country),
         external_id: formattedUserData.external_id,
-        client_ip_address: formattedUserData.client_ip_address,
-        client_user_agent: formattedUserData.client_user_agent
+        client_ip_address: formattedUserData.client_ip_address
+        // Removido client_user_agent redundante
       };
       
       const fallbackParams = {
@@ -151,8 +150,7 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
           user_data: hashedUserData 
         }),
         event_source_url: window.location.href,
-        client_user_agent: navigator.userAgent,
-        event_time: Math.floor(Date.now() / 1000),
+        event_time: getCurrentTimestamp(),
         data_enriched: false,
         fallback_used: true
       };
@@ -213,7 +211,11 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
         // Configurar endpoint do CAPI Gateway
         window.fbq('set', 'server_event_uri', 'https://capig.maracujazeropragas.com/');
         
-        // Disparar PageView JÁ ENRIQUECIDO com dados persistidos E DADOS REAIS DO CLIENTE
+        // Disparar PageView PADRÃO (sem parâmetros personalizados)
+        // Isso garante que o Facebook o reconheça como PageView padrão
+        window.fbq('track', 'PageView');
+        
+        // Disparar evento separado com dados enriquecidos para CAPI
         try {
           const persistedUserData = getPersistedUserData();
           const enrichedClientData = await getEnrichedClientData(persistedUserData);
@@ -232,7 +234,7 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
             client_info_source: enrichedClientData.client_info_source
           };
           
-          // HASH dos dados para PageView
+          // HASH dos dados para o evento enriquecido (sem user agent redundante)
           const hashedUserData = {
             em: await hashData(finalUserData.em),
             ph: await hashData(finalUserData.ph),
@@ -244,84 +246,48 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
             country: await hashData(finalUserData.country),
             external_id: finalUserData.external_id,
             client_ip_address: finalUserData.client_ip_address,
-            client_user_agent: finalUserData.client_user_agent,
             client_timezone: finalUserData.client_timezone,
             client_isp: finalUserData.client_isp,
             client_info_source: finalUserData.client_info_source
           };
         
-          const pageViewParams: any = {
-            // Metadata para CAPI Gateway
+          const pageViewEnrichedParams: any = {
+            // Metadata essencial para CAPI Gateway (sem user agent redundante)
             event_source_url: window.location.href,
-            client_user_agent: navigator.userAgent,
-            event_time: Math.floor(Date.now() / 1000),
+            event_time: getCurrentTimestamp(),
             ...(persistedUserData?.sessionId && { 
               session_id: persistedUserData.sessionId 
             }),
             has_persisted_data: !!persistedUserData,
             data_hashed: true,
             data_enriched: true,
-            enrichment_timestamp: Date.now()
+            enrichment_timestamp: getCurrentTimestamp()
           };
           
-          // Enriquecer PageView com user_data hasheado se disponível
+          // Enriquecer com user_data hasheado se disponível
           if (Object.keys(hashedUserData).length > 0) {
-            pageViewParams.user_data = hashedUserData;
+            pageViewEnrichedParams.user_data = hashedUserData;
           }
           
-          console.log('🚀 PageView ENRIQUECIDO COM DADOS REAIS:', {
+          console.log('🚀 PageView PADRÃO disparado + evento enriquecido:', {
             hasUserData: !!persistedUserData,
             hasRealIP: !!finalUserData.client_ip_address,
             city: finalUserData.ct,
             state: finalUserData.st,
             zip: finalUserData.zip,
             country: finalUserData.country,
-            enrichmentSource: finalUserData.client_info_source,
-            params: pageViewParams
+            enrichmentSource: finalUserData.client_info_source
           });
           
-          window.fbq('track', 'PageView', pageViewParams);
+          // Disparar evento customizado com dados enriquecidos (não afeta PageView padrão)
+          window.fbq('trackCustom', 'PageViewEnriched', pageViewEnrichedParams);
           
         } catch (error) {
           console.error('❌ Erro ao enriquecer PageView:', error);
           
-          // Fallback para PageView básico
-          const persistedUserData = getPersistedUserData();
-          const formattedUserData = formatUserDataForMeta(persistedUserData);
-          
-          const hashedUserData = {
-            em: await hashData(formattedUserData.em),
-            ph: await hashData(formattedUserData.ph),
-            fn: await hashData(formattedUserData.fn),
-            ln: await hashData(formattedUserData.ln),
-            ct: await hashData(formattedUserData.ct),
-            st: await hashData(formattedUserData.st),
-            zip: await hashData(formattedUserData.zip),
-            country: await hashData(formattedUserData.country),
-            external_id: formattedUserData.external_id,
-            client_ip_address: formattedUserData.client_ip_address,
-            client_user_agent: formattedUserData.client_user_agent
-          };
-        
-          const fallbackParams: any = {
-            event_source_url: window.location.href,
-            client_user_agent: navigator.userAgent,
-            event_time: Math.floor(Date.now() / 1000),
-            ...(persistedUserData?.sessionId && { 
-              session_id: persistedUserData.sessionId 
-            }),
-            has_persisted_data: !!persistedUserData,
-            data_hashed: true,
-            data_enriched: false,
-            fallback_used: true
-          };
-          
-          if (Object.keys(hashedUserData).length > 0) {
-            fallbackParams.user_data = hashedUserData;
-          }
-          
-          console.log('🔄 PageView fallback (sem enriquecimento):', fallbackParams);
-          window.fbq('track', 'PageView', fallbackParams);
+          // PageView padrão sem parâmetros (fallback)
+          console.log('🔄 PageView padrão (fallback)');
+          // PageView já foi disparado no início, não precisa disparar novamente
         }
       }
     };
