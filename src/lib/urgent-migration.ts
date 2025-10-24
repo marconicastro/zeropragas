@@ -4,8 +4,18 @@
  * EXECUTA IMEDIATAMENTE A MIGRAÇÃO PARA O SISTEMA UNIFICADO
  */
 
-import { autoMigrateIfNeeded } from './migration-script.js';
-import { validateUnifiedSystem } from './unified-events-system.js';
+import { autoMigrateIfNeeded } from './migration-script';
+import { validateUnifiedSystem } from './unified-events-system';
+
+// Tipagens básicas
+declare global {
+  interface Window {
+    executeUrgentMigration: () => Promise<boolean>;
+    autoExecuteUrgentMigration: () => Promise<boolean>;
+    checkMigrationStatus: () => boolean;
+    emergencyReset: () => boolean;
+  }
+}
 
 /**
  * EXECUTA MIGRAÇÃO URGENTE

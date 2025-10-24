@@ -10,6 +10,32 @@
 import { getStandardizedUserData } from './unifiedUserData';
 import { getPersistedUserData } from './userDataPersistence';
 
+// Tipagens básicas
+interface CustomParams {
+  [key: string]: any;
+  trigger_type?: string;
+  time_on_page?: number;
+  scroll_depth?: number;
+  button_position?: string;
+  page_section?: string;
+}
+
+// Declarações globais para o TypeScript
+declare global {
+  interface Window {
+    fbq: (command: string, eventName: string, parameters?: any) => void;
+    fireAllUnifiedEvents: () => Promise<void>;
+    fireUnifiedPageView: (customParams?: CustomParams) => Promise<any>;
+    fireUnifiedViewContent: (customParams?: CustomParams) => Promise<any>;
+    fireUnifiedScrollDepth: (percent: number, customParams?: CustomParams) => Promise<any>;
+    fireUnifiedLead: (customParams?: CustomParams) => Promise<any>;
+    fireUnifiedInitiateCheckout: (customParams?: CustomParams) => Promise<any>;
+    fireUnifiedCTAClick: (buttonText: string, customParams?: CustomParams) => Promise<any>;
+    saveUserDataForEvents: (userData: any) => void;
+    validateUnifiedSystem: () => boolean;
+  }
+}
+
 /**
  * VERIFICA SE TEM DADOS PERSISTIDOS (para logging)
  */
@@ -34,7 +60,7 @@ function checkPersistedData() {
 /**
  * 1. PageView PADRÃO (SISTEMA UNIFICADO)
  */
-export async function fireUnifiedPageView(customParams = {}) {
+export async function fireUnifiedPageView(customParams: CustomParams = {}) {
   try {
     console.group('📄 PageView - SISTEMA UNIFICADO');
     checkPersistedData();
@@ -66,7 +92,7 @@ export async function fireUnifiedPageView(customParams = {}) {
 /**
  * 2. ViewContent (SISTEMA UNIFICADO)
  */
-export async function fireUnifiedViewContent(customParams = {}) {
+export async function fireUnifiedViewContent(customParams: CustomParams = {}) {
   try {
     console.group('👁️ ViewContent - SISTEMA UNIFICADO');
     checkPersistedData();
@@ -115,7 +141,7 @@ export async function fireUnifiedViewContent(customParams = {}) {
 /**
  * 3. ScrollDepth (SISTEMA UNIFICADO)
  */
-export async function fireUnifiedScrollDepth(percent, customParams = {}) {
+export async function fireUnifiedScrollDepth(percent: number, customParams: CustomParams = {}) {
   try {
     console.group('📜 ScrollDepth - SISTEMA UNIFICADO');
     checkPersistedData();
@@ -167,7 +193,7 @@ export async function fireUnifiedScrollDepth(percent, customParams = {}) {
 /**
  * 4. Lead (SISTEMA UNIFICADO)
  */
-export async function fireUnifiedLead(customParams = {}) {
+export async function fireUnifiedLead(customParams: CustomParams = {}) {
   try {
     console.group('🎯 Lead - SISTEMA UNIFICADO');
     checkPersistedData();
@@ -232,7 +258,7 @@ export async function fireUnifiedLead(customParams = {}) {
 /**
  * 5. InitiateCheckout (SISTEMA UNIFICADO)
  */
-export async function fireUnifiedInitiateCheckout(customParams = {}) {
+export async function fireUnifiedInitiateCheckout(customParams: CustomParams = {}) {
   try {
     console.group('🛒 InitiateCheckout - SISTEMA UNIFICADO');
     checkPersistedData();
@@ -290,7 +316,7 @@ export async function fireUnifiedInitiateCheckout(customParams = {}) {
 /**
  * 6. CTAClick (SISTEMA UNIFICADO)
  */
-export async function fireUnifiedCTAClick(buttonText, customParams = {}) {
+export async function fireUnifiedCTAClick(buttonText: string, customParams: CustomParams = {}) {
   try {
     console.group('🖱️ CTAClick - SISTEMA UNIFICADO');
     checkPersistedData();
@@ -391,9 +417,9 @@ export async function fireAllUnifiedEvents() {
 /**
  * SALVA DADOS DO USUÁRIO (para ser usado nos eventos)
  */
-export function saveUserDataForEvents(userData) {
+export function saveUserDataForEvents(userData: any) {
   // Import dinâmico para evitar circular dependency
-  import('./userDataPersistence.js').then(({ saveUserData }) => {
+  import('./userDataPersistence').then(({ saveUserData }) => {
     saveUserData(userData, true);
     console.log('💾 Dados salvos para próximos eventos (Nota 9.3 garantida)');
   });

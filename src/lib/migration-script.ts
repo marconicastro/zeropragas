@@ -5,7 +5,7 @@
  * Resultado esperado: 100% de cobertura geográfica para todos os eventos
  */
 
-import { migrateToUnifiedSystem, fireStandardEvent } from './meta-pixel-standard.js';
+import { migrateToUnifiedSystem, fireStandardEvent } from './meta-pixel-standard';
 import { debugDataQuality } from './unifiedUserData';
 
 /**
@@ -146,7 +146,7 @@ export async function testUnifiedSystem() {
       console.log(`\n📤 Testando ${event.name}...`);
       
       // Simular disparo do evento (sem enviar para Meta)
-      const standardParams = await import('./meta-pixel-standard.js').then(m => 
+      const standardParams = await import('./meta-pixel-standard').then(m => 
         m.standardizeEventParams(event.name, event.params)
       );
       
