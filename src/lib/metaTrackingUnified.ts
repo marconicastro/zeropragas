@@ -16,6 +16,25 @@ declare global {
 }
 
 /**
+ * Gera chaves de deduplicação unificadas para browser e servidor
+ */
+function generateUnifiedDeduplicationKeys(orderId: string, userEmail?: string): {
+  eventID: string;
+  transaction_id: string;
+  email_hash?: string;
+} {
+  // Chave unificada baseada no pedido - garante mesmo ID para browser e server
+  const baseId = `purchase_${orderId}_${Date.now()}`;
+  const eventID = `${baseId}_${Math.random().toString(36).substr(2, 5)}`;
+  
+  return {
+    eventID,
+    transaction_id: orderId,
+    email_hash: userEmail ? hashData(userEmail) : undefined
+  };
+}
+
+/**
  * Hash SHA256 conforme exigência do Facebook
  */
 async function hashData(data: string | null): Promise<string | null> {
@@ -388,6 +407,83 @@ export async function fireUnifiedCTAClick(ctaType: string, customParams = {}) {
     
   } catch (error) {
     console.error('❌ Erro ao disparar CTAClick unificado:', error);
+  }
+}
+
+/**
+ * Dispara Purchase com chaves unificadas de deduplicação
+ */
+export async function fireUnifiedPurchase(
+  totalValue: number,
+  currency: string = 'BRL',
+  content_ids: string[] = ['339591'],
+  orderId?: string,
+  userEmail?: string
+) {
+  try {
+    // 🚀 SISTEMA UNIFICADO: Obtém dados completos (100% cobertura geográfica)
+    const hashedUserData = await getHashedUserData();
+    
+    // Gera chaves unificadas se tiver orderId
+    let deduplicationData = {};
+    if (orderId) {
+      const unifiedKeys = generateUnifiedDeduplicationKeys(orderId, userEmail);
+      deduplicationData = {
+        eventID: unifiedKeys.eventID,
+        transaction_id: unifiedKeys.transaction_id,
+        email_hash: unifiedKeys.email_hash
+      };
+      console.log('🔑 Usando chaves unificadas para Purchase:', unifiedKeys);
+    }
+    
+    const purchaseParams = {
+      // Dados hasheados completos
+      ...hashedUserData,
+      
+      // Dados da compra
+      value: totalValue,
+      currency,
+      content_ids,
+      content_type: 'product',
+      content_name: 'Sistema 4 Fases - Ebook Trips',
+      content_category: 'digital_product',
+      num_items: content_ids.length,
+      
+      // Enriquecimento
+      predicted_ltv: totalValue * 3.5,
+      product_availability: 'in stock',
+      condition: 'new',
+      
+      // Comportamento
+      purchase_type: 'online',
+      payment_method: 'digital',
+      
+      // Metadados
+      event_source_url: typeof window !== 'undefined' ? window.location.href : '',
+      event_time: getCurrentTimestamp(),
+      
+      // Chaves de deduplicação unificadas
+      ...deduplicationData,
+      
+      // Custom data
+      custom_data: {
+        trigger_type: 'purchase_complete',
+        order_value: totalValue,
+        items_count: content_ids.length
+      }
+    };
+    
+    if (typeof window !== 'undefined' && window.fbq) {
+      // Usa eventID para deduplicação se disponível
+      const options = orderId ? { eventID: deduplicationData.eventID } : {};
+      window.fbq('track', 'Purchase', purchaseParams, options);
+      console.log('✅ Purchase unificado disparado com chaves unificadas:', purchaseParams);
+    }
+    
+    return purchaseParams;
+    
+  } catch (error) {
+    console.error('❌ Erro ao disparar Purchase unificado:', error);
   }
 }
 

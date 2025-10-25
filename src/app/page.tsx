@@ -251,6 +251,32 @@ export default function App() {
       }
     });
 
+    // Gerar orderId único para esta transação
+    const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    // Disparar Purchase com chaves unificadas de deduplicação
+    await trackMetaEvent('Purchase', {
+      value: 39.90,
+      currency: 'BRL',
+      content_name: 'Sistema 4 Fases - Ebook Trips',
+      content_ids: ['339591'],
+      content_type: 'product',
+      transaction_id: orderId,
+      user_data: {
+        em: formData.email,
+        ph: phoneClean,
+        fn: cleanFullName,
+        // Dados adicionais para enriquecer EQM (se disponíveis)
+        ...(formData.city && { ct: formData.city.trim() }),
+        ...(formData.state && { st: formData.state.trim() }),
+        ...(formData.cep && { zip: formData.cep.replace(/\D/g, '') })
+      }
+    }, {
+      // Chaves unificadas para deduplicação browser/server
+      orderId,
+      userEmail: formData.email
+    });
+
     // Construir URL final rapidamente
     // LINK ATUALIZADO: https://go.allpes.com.br/r1wl4qyyfv (novo link de pagamento)
     const finalUrlString = `https://go.allpes.com.br/r1wl4qyyfv?${new URLSearchParams(additionalParams).toString()}`;

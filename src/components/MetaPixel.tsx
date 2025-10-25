@@ -41,7 +41,7 @@ async function hashData(data: string | null): Promise<string | null> {
 }
 
 // Função auxiliar para rastreamento de eventos Meta COM DADOS ENRIQUECIDOS
-export const trackMetaEvent = async (eventName: string, parameters?: object) => {
+export const trackMetaEvent = async (eventName: string, parameters?: object, deduplicationOptions?: { orderId?: string; userEmail?: string }) => {
   if (typeof window !== 'undefined' && window.fbq) {
     try {
       // 1. Obter dados persistidos do usuário
@@ -85,7 +85,27 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         client_info_source: finalUserData.client_info_source
       };
       
-      // 6. Enriquecer parâmetros com dados hasheados
+      // 6. Gerar chaves unificadas se disponível
+      let fbqOptions = {};
+      if (deduplicationOptions?.orderId) {
+        const baseId = `purchase_${deduplicationOptions.orderId}_${Date.now()}`;
+        const eventID = `${baseId}_${Math.random().toString(36).substr(2, 5)}`;
+        
+        fbqOptions = {
+          eventID,
+          // Adicionar chaves de deduplicação aos parâmetros
+          transaction_id: deduplicationOptions.orderId,
+          email_hash: deduplicationOptions.userEmail ? await hashData(deduplicationOptions.userEmail) : undefined
+        };
+        
+        console.log('🔑 Usando chaves unificadas de deduplicação:', {
+          eventID,
+          transaction_id: deduplicationOptions.orderId,
+          eventName
+        });
+      }
+      
+      // 7. Enriquecer parâmetros com dados hasheados
       const enhancedParams = {
         ...parameters,
         // Sempre incluir user_data se disponível (para EQM máxima)
@@ -106,7 +126,9 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         // Flag para indicar dados enriquecidos
         data_enriched: true,
         // Metadados de qualidade (padronizado para segundos)
-        enrichment_timestamp: getCurrentTimestamp()
+        enrichment_timestamp: getCurrentTimestamp(),
+        // Chaves de deduplicação (se aplicável)
+        ...fbqOptions
       };
 
       // Log detalhado para debug (remover em produção)
@@ -118,10 +140,11 @@ export const trackMetaEvent = async (eventName: string, parameters?: object) => 
         zip: finalUserData.zip,
         country: finalUserData.country,
         enrichmentSource: finalUserData.client_info_source,
+        hasDeduplication: !!deduplicationOptions?.orderId,
         params: enhancedParams
       });
       
-      window.fbq('track', eventName, enhancedParams);
+      window.fbq('track', eventName, enhancedParams, Object.keys(fbqOptions).length > 0 ? fbqOptions : undefined);
       
     } catch (error) {
       console.error('❌ Erro ao fazer trackMetaEvent com dados enriquecidos:', error);

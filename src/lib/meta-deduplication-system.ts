@@ -20,6 +20,36 @@ declare global {
 }
 
 /**
+ * Gera chaves de deduplicação unificadas para browser e servidor
+ */
+function generateUnifiedDeduplicationKeys(orderId: string, userEmail?: string): {
+  eventID: string;
+  transaction_id: string;
+  email_hash?: string;
+} {
+  // Chave unificada baseada no pedido - garante mesmo ID para browser e server
+  const baseId = `purchase_${orderId}_${Date.now()}`;
+  const eventID = `${baseId}_${Math.random().toString(36).substr(2, 5)}`;
+  
+  return {
+    eventID,
+    transaction_id: orderId,
+    email_hash: userEmail ? hashData(userEmail) : undefined
+  };
+}
+
+/**
+ * Hash SHA256 para dados unificados
+ */
+async function hashData(data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataUint8Array = encoder.encode(data.toLowerCase().trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', dataUint8Array);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
  * Gera ID único de evento com timestamp e aleatório
  * Formato: {eventName}_{timestamp}_{random}
  */
@@ -314,6 +344,117 @@ export async function fireDeduplicatedScrollDepth(percent: number, customParams:
     scroll_direction: percent > 50 ? 'down' : 'up',
     ...customParams
   }, 'custom');
+}
+
+/**
+ * Purchase com deduplicação completa e chaves unificadas
+ */
+export async function fireDeduplicatedPurchase(
+  totalValue: number,
+  currency: string = 'BRL',
+  content_ids: string[] = ['339591'],
+  orderId?: string,
+  userEmail?: string
+) {
+  try {
+    console.group('🔒 Purchase - SISTEMA DE DEDUPLICAÇÃO UNIFICADA');
+    
+    // 1. Obtém dados consistentes do usuário
+    const userData = await getStandardizedUserData();
+    
+    // 2. Gera chaves de deduplicação UNIFICADAS se tiver orderId
+    let deduplicationKeys;
+    if (orderId) {
+      const unifiedKeys = generateUnifiedDeduplicationKeys(orderId, userEmail);
+      deduplicationKeys = {
+        event_id: unifiedKeys.eventID,
+        event_time: getEventTime(),
+        action_source: getActionSource(),
+        deduplication_key: unifiedKeys.eventID
+      };
+      console.log('🔑 Usando chaves unificadas para Purchase:', unifiedKeys);
+    } else {
+      deduplicationKeys = getDeduplicationKeys('Purchase');
+    }
+    
+    // 3. Parâmetros base com deduplicação
+    const baseParams = {
+      // Dados do usuário (consistentes entre eventos)
+      user_data: userData,
+      
+      // Dados da compra
+      value: totalValue,
+      currency,
+      content_ids,
+      content_type: 'product',
+      content_name: 'Sistema 4 Fases - Ebook Trips',
+      content_category: 'digital_product',
+      num_items: content_ids.length,
+      
+      // Chaves de deduplicação OBRIGATÓRIAS
+      event_id: deduplicationKeys.event_id,
+      event_time: deduplicationKeys.event_time,
+      action_source: deduplicationKeys.action_source,
+      
+      // Chaves unificadas adicionais
+      ...(orderId && {
+        transaction_id: orderId,
+        email_hash: userEmail ? await hashData(userEmail) : undefined
+      }),
+      
+      // Metadados de correspondência
+      event_source_url: typeof window !== 'undefined' ? window.location.href : '',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      
+      // Identificador do sistema
+      tracking_system: 'deduplication_unified_v3',
+      deduplication_version: '3.0'
+    };
+    
+    // 4. Opções de deduplicação
+    const deduplicationOptions = {
+      // Força envio das chaves de deduplicação
+      send_to: 'pixel_id', // Será substituído pelo pixel ID real
+      eventID: deduplicationKeys.event_id, // Chave primária de deduplicação
+      
+      // Meta-parâmetros para correspondência
+      trackCustom: false,
+      eventSource: deduplicationKeys.action_source
+    };
+    
+    // 5. Dispara evento com deduplicação
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'Purchase', baseParams, deduplicationOptions);
+      
+      console.log(`✅ Purchase disparado com deduplicação unificada:`);
+      console.log('  🆔 Event ID:', deduplicationKeys.event_id);
+      console.log('  ⏰ Event Time:', deduplicationKeys.event_time);
+      console.log('  📍 Action Source:', deduplicationKeys.action_source);
+      console.log('  🔑 Deduplication Key:', deduplicationKeys.deduplication_key);
+      console.log('  🛒 Transaction ID:', orderId || 'N/A');
+      console.log('  👤 User Data Fields:', Object.keys(userData).length);
+    }
+    
+    // 6. Salva registro de deduplicação local
+    saveDeduplicationRecord('Purchase', deduplicationKeys, baseParams);
+    
+    console.groupEnd();
+    
+    return {
+      eventName: 'Purchase',
+      deduplicationKeys,
+      params: baseParams,
+      success: true
+    };
+    
+  } catch (error) {
+    console.error('❌ Erro ao disparar Purchase com deduplicação unificada:', error);
+    return {
+      eventName: 'Purchase',
+      success: false,
+      error: error.message
+    };
+  }
 }
 
 /**

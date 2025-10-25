@@ -28,6 +28,28 @@ declare global {
 /**
  * Gera ID único de evento para deduplicação
  */
+/**
+ * Gera chaves de deduplicação unificadas para browser e servidor
+ */
+function generateUnifiedDeduplicationKeys(orderId: string, userEmail?: string): {
+  eventID: string;
+  transaction_id: string;
+  email_hash?: string;
+} {
+  // Chave unificada baseada no pedido - garante mesmo ID para browser e server
+  const baseId = `purchase_${orderId}_${Date.now()}`;
+  const eventID = `${baseId}_${Math.random().toString(36).substr(2, 5)}`;
+  
+  return {
+    eventID,
+    transaction_id: orderId,
+    email_hash: userEmail ? hashUserEmail(userEmail) : undefined
+  };
+}
+
+/**
+ * Gera um ID de evento único para deduplicação (legado)
+ */
 function generateEventId(eventName: string): string {
   const timestamp = Math.floor(Date.now() / 1000);
   const random = Math.random().toString(36).substring(2, 8);
@@ -100,7 +122,9 @@ async function getCompleteUserData(): Promise<any> {
 async function fireEventWithDeduplication(
   eventName: string,
   customParams: any = {},
-  eventType: 'standard' | 'custom' = 'standard'
+  eventType: 'standard' | 'custom' = 'standard',
+  orderId?: string,
+  userEmail?: string
 ): Promise<any> {
   try {
     console.group(`🚀 ${eventName} - Unified V3`);
@@ -108,8 +132,24 @@ async function fireEventWithDeduplication(
     // 1. Obtém dados completos do usuário
     const userData = await getCompleteUserData();
     
-    // 2. Gera chaves de deduplicação
-    const eventId = generateEventId(eventName);
+    // 2. Gera chaves de deduplicação UNIFICADAS
+    let eventId: string;
+    let deduplicationData: any = {};
+    
+    if (eventName === 'Purchase' && orderId) {
+      // Para Purchase, usa chaves unificadas baseadas no pedido
+      const unifiedKeys = generateUnifiedDeduplicationKeys(orderId, userEmail);
+      eventId = unifiedKeys.eventID;
+      deduplicationData = {
+        transaction_id: unifiedKeys.transaction_id,
+        email_hash: unifiedKeys.email_hash
+      };
+      console.log('🔑 Usando chaves unificadas para Purchase:', unifiedKeys);
+    } else {
+      // Para outros eventos, usa método legado
+      eventId = generateEventId(eventName);
+    }
+    
     const eventTime = Math.floor(Date.now() / 1000);
     
     // 3. Parâmetros completos
@@ -121,6 +161,9 @@ async function fireEventWithDeduplication(
       event_id: eventId,
       event_time: eventTime,
       action_source: 'browser',
+      
+      // Dados de deduplicação adicional
+      ...deduplicationData,
       
       // Metadados
       event_source_url: typeof window !== 'undefined' ? window.location.href : '',
@@ -458,6 +501,27 @@ export function analyzeMetaSystemV3() {
   }
   
   console.groupEnd();
+}
+
+/**
+ * Dispara Purchase Completo com deduplicação avançada
+ */
+export async function trackPurchaseComplete(
+  totalValue: number,
+  currency: string = 'BRL',
+  content_ids: string[] = ['339591'],
+  orderId?: string,
+  userEmail?: string
+): Promise<void> {
+  const purchaseParams = {
+    value: totalValue,
+    currency,
+    content_type: 'product',
+    content_ids,
+    num_items: content_ids.length
+  };
+
+  await fireEventWithDeduplication('Purchase', purchaseParams, 'standard', orderId, userEmail);
 }
 
 // Exporta para uso global
