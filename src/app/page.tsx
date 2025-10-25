@@ -6,6 +6,7 @@ import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
 import { trackMetaEvent } from '@/components/MetaPixel';
+import { fireUnifiedLeadV3, fireUnifiedInitiateCheckoutV3 } from '@/lib/meta-pixel-unified-v3';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import DebugPersistence from '@/components/DebugPersistence';
 
@@ -220,11 +221,12 @@ export default function App() {
       additionalParams['zip'] = formData.cep.replace(/\D/g, '');
     }
 
-    // Disparar evento Lead (agora no momento correto - após preenchimento)
-    await trackMetaEvent('Lead', {
+    // Disparar evento Lead com sistema unificado de deduplicação
+    await fireUnifiedLeadV3({
+      // Mantendo exatamente os mesmos parâmetros
       content_name: 'Lead - Formulário Preenchido',
       content_category: 'Formulário',
-      value: 15.00,  // CORRIGIDO: Valor realista para lead
+      value: 15.00,
       currency: 'BRL',
       user_data: {
         em: formData.email,
@@ -233,8 +235,9 @@ export default function App() {
       }
     });
 
-    // Disparar evento InitiateCheckout com Advanced Matching Enriquecido
-    await trackMetaEvent('InitiateCheckout', {
+    // Disparar evento InitiateCheckout com sistema unificado de deduplicação
+    await fireUnifiedInitiateCheckoutV3({
+      // Mantendo exatamente os mesmos parâmetros
       value: 39.90,
       currency: 'BRL',
       content_name: 'Sistema 4 Fases - Ebook Trips',
