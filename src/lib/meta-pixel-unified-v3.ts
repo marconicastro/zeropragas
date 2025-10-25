@@ -503,27 +503,6 @@ export function analyzeMetaSystemV3() {
   console.groupEnd();
 }
 
-/**
- * Dispara Purchase Completo com deduplicação avançada
- */
-export async function trackPurchaseComplete(
-  totalValue: number,
-  currency: string = 'BRL',
-  content_ids: string[] = ['339591'],
-  orderId?: string,
-  userEmail?: string
-): Promise<void> {
-  const purchaseParams = {
-    value: totalValue,
-    currency,
-    content_type: 'product',
-    content_ids,
-    num_items: content_ids.length
-  };
-
-  await fireEventWithDeduplication('Purchase', purchaseParams, 'standard', orderId, userEmail);
-}
-
 // Exporta para uso global
 if (typeof window !== 'undefined') {
   window.fireMetaUnifiedV3 = fireAllUnifiedEventsV3;
