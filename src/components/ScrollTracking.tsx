@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { trackMetaEvent } from './MetaPixel';
+import { sendToCAPIG } from '@/lib/capi-processor';
 
 interface ScrollTrackingProps {
   enabled?: boolean;
@@ -42,7 +42,7 @@ const ScrollTracking: React.FC<ScrollTrackingProps> = ({
             // 🎯 ViewContent SÓ no 25%
             viewContentFired.current = true;
             
-            trackMetaEvent('ViewContent', {
+            sendToCAPIG('ViewContent', {
               content_name: 'Page Engagement - 25%',
               content_category: 'engagement',
               scroll_depth: threshold,
@@ -57,7 +57,7 @@ const ScrollTracking: React.FC<ScrollTrackingProps> = ({
           }
           
           // 📊 ScrollEvent para todos os thresholds
-          trackMetaEvent('ScrollEvent', {
+          sendToCAPIG('ScrollEvent', {
             content_name: `Scroll ${threshold}%`,
             content_category: 'engagement',
             scroll_depth: threshold,

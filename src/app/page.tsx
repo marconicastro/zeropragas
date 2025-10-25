@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
-import { trackMetaEvent } from '@/components/MetaPixel';
-import { fireUnifiedLeadV3, fireUnifiedInitiateCheckoutV3 } from '@/lib/meta-pixel-unified-v3';
+import { sendToCAPIG } from '@/lib/capig-processor';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import DebugPersistence from '@/components/DebugPersistence';
 
@@ -81,13 +80,13 @@ export default function App() {
 
       // Disparar evento de 50% do scroll
       if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
-        await trackMetaEvent('ScrollDepth', { percent: 50 });
+        await sendToCAPIG('ScrollDepth', { percent: 50 });
         setScrollEventsFired(prev => ({ ...prev, '50': true }));
       }
 
       // Disparar evento de 75% do scroll
       if (scrollPercentage >= 75 && !scrollEventsFired['75']) {
-        await trackMetaEvent('ScrollDepth', { percent: 75 });
+        await sendToCAPIG('ScrollDepth', { percent: 75 });
         setScrollEventsFired(prev => ({ ...prev, '75': true }));
       }
     };
@@ -101,7 +100,7 @@ export default function App() {
     // Disparar ViewContent após 15 segundos na página (indica interesse real)
     const viewContentTimer = setTimeout(async () => {
       if (!viewContentFired) {
-        await trackMetaEvent('ViewContent', {
+        await sendToCAPIG('ViewContent', {
           content_name: 'Sistema 4 Fases - Ebook Trips',
           content_ids: ['339591'],
           value: 39.90,
@@ -114,7 +113,7 @@ export default function App() {
         });
         
         setViewContentFired(true);
-        console.log('🎯 ViewContent disparado por timing (15s)');
+        console.log('🎯 ViewContent disparado por CAPIG (15s)');
       }
     }, 15000); // 15 segundos
 
@@ -126,7 +125,7 @@ export default function App() {
         const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
 
         if (scrollPercentage >= 25) {
-          await trackMetaEvent('ViewContent', {
+          await sendToCAPIG('ViewContent', {
             content_name: 'Sistema 4 Fases - Ebook Trips',
             content_ids: ['339591'],
             value: 39.90,
@@ -221,8 +220,8 @@ export default function App() {
       additionalParams['zip'] = formData.cep.replace(/\D/g, '');
     }
 
-    // Disparar evento Lead com sistema unificado de deduplicação
-    await fireUnifiedLeadV3({
+    // Disparar evento Lead via CAPIG
+    await sendToCAPIG('Lead', {
       // Mantendo exatamente os mesmos parâmetros
       content_name: 'Lead - Formulário Preenchido',
       content_category: 'Formulário',
@@ -235,8 +234,8 @@ export default function App() {
       }
     });
 
-    // Disparar evento InitiateCheckout com sistema unificado de deduplicação
-    await fireUnifiedInitiateCheckoutV3({
+    // Disparar evento InitiateCheckout via CAPIG
+    await sendToCAPIG('InitiateCheckout', {
       // Mantendo exatamente os mesmos parâmetros
       value: 39.90,
       currency: 'BRL',
@@ -267,8 +266,8 @@ export default function App() {
   };
 
   const scrollToCheckout = async () => {
-    // Disparar evento específico de CTA (não ViewContent para evitar duplicidade)
-    await trackMetaEvent('CTAClick', {
+    // Disparar evento específico de CTA via CAPIG
+    await sendToCAPIG('CTAClick', {
       content_name: 'CTA - Quero Economizar',
       content_ids: ['339591'],
       value: 39.90,
@@ -285,8 +284,8 @@ export default function App() {
 
   // Função principal de checkout (REDIRECIONAMENTO)
   const handleCheckoutRedirect = async (event) => {
-    // Disparar evento específico de CTA final (não ViewContent para evitar duplicidade)
-    await trackMetaEvent('CTAClick', {
+    // Disparar evento específico de CTA final via CAPI
+    await sendToCAPIG('CTAClick', {
       content_name: 'CTA - Final Checkout',
       content_ids: ['339591'],
       value: 39.90,
@@ -304,7 +303,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-  
+      {/* PageView via CAPIG - Primeiro evento */}
+      {useEffect(() => {
+        sendToCAPIG('PageView', {
+          content_category: 'page_view',
+          page_title: typeof document !== 'undefined' ? document.title : '',
+          page_location: typeof window !== 'undefined' ? window.location.href : '',
+          referrer: typeof document !== 'undefined' ? document.referrer : 'direct'
+        });
+      }, [])}
 
       {/* Barra de Urgência - Otimizada para Mobile */}
       <div className="bg-red-600 text-white py-2 px-2 sm:px-4 text-center animate-pulse">
@@ -380,7 +387,7 @@ export default function App() {
 
             {/* CTA Principal Mega Otimizado - Responsivo */}
             <Button 
-              onClick={scrollToCheckout}
+              onClick={handleCheckoutRedirect}
               className="bg-orange-500 hover:bg-orange-600 text-white font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl md:text-2xl mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-200 shadow-2xl animate-bounce w-full sm:w-auto"
             >
               <Rocket className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -605,7 +612,7 @@ export default function App() {
             </div>
 
             <Button 
-              onClick={scrollToCheckout}
+              onClick={handleCheckoutRedirect}
               className="bg-yellow-400 hover:bg-yellow-500 text-green-800 font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl w-full sm:w-auto"
             >
               <Target className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -774,7 +781,7 @@ export default function App() {
             </div>
 
             <Button 
-              onClick={scrollToCheckout}
+              onClick={handleCheckoutRedirect}
               className="bg-yellow-400 hover:bg-yellow-500 text-red-600 font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl animate-pulse w-full sm:w-auto"
             >
               <Zap className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -849,17 +856,14 @@ export default function App() {
 
                 {/* CTA Final - Responsivo */}
                 {/* LINK ATUALIZADO: https://go.allpes.com.br/r1wl4qyyfv (novo link de pagamento) */}
-                <a 
-                  href="https://go.allpes.com.br/r1wl4qyyfv" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <button 
                   id="botao-compra-allpes" 
                   onClick={handleCheckoutRedirect}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 sm:py-8 px-4 sm:px-6 rounded-lg text-xl sm:text-2xl md:text-3xl transform hover:scale-105 transition-all duration-300 shadow-2xl inline-flex items-center justify-center gap-3 sm:gap-4"
                 >
                   <DollarSign className="w-6 h-6 sm:w-8 sm:h-8" />
                   COMPRAR AGORA
-                </a>
+                </button>
 
                 <div className="text-center text-xs sm:text-sm text-gray-600 mt-3 sm:mt-4 space-y-1">
                   <p>🔒 Compra 100% segura e protegida</p>
@@ -893,7 +897,7 @@ export default function App() {
               </div>
               
               <Button 
-                onClick={scrollToCheckout}
+                onClick={handleCheckoutRedirect}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-full text-sm sm:text-lg w-full sm:w-auto"
               >
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
@@ -974,6 +978,27 @@ export default function App() {
 
       {/* Componente de Debug (apenas desenvolvimento) */}
       {process.env.NODE_ENV === 'development' && <DebugPersistence />}
+      
+      {/* Função de Teste CAPIG (Apenas para verificação) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-blue-600 text-white p-2 rounded-lg text-xs z-50">
+          <button
+            onClick={async () => {
+              console.log('🧪 Testando CAPIG...');
+              
+              const result = await sendToCAPIG('TestEvent', {
+                test: true,
+                value: 1.00,
+                currency: 'BRL'
+              });
+              console.log('CAPIG Test Result:', result);
+            }}
+            className="bg-blue-500 hover:bg-blue-700 px-2 py-1 rounded text-white"
+          >
+            Testar CAPIG
+          </button>
+        </div>
+      )}
     </div>
   );
 }
