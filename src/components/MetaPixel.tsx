@@ -6,6 +6,9 @@ import { formatEnrichedDataForMeta, getEnrichedUserData } from '@/lib/enrichedUs
 import { getEnrichedClientData } from '@/lib/clientInfoService';
 import { getCurrentTimestamp } from '@/lib/timestampUtils';
 
+// 🎛️ CONTROLE DE BROWSER PIXEL
+const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
+
 // Declaração global para tipagem do fbq
 declare global {
   interface Window {
@@ -153,10 +156,20 @@ export const trackMetaEvent = async (eventName: string, parameters?: object, ded
         country: finalUserData.country,
         enrichmentSource: finalUserData.client_info_source,
         hasDeduplication: !!deduplicationOptions?.orderId,
+        browserPixelEnabled: BROWSER_PIXEL_ENABLED,
         params: enhancedParams
       });
       
-      window.fbq('track', eventName, enhancedParams, Object.keys(fbqOptions).length > 0 ? fbqOptions : undefined);
+      // 🎛️ CONTROLE DE ENVIO BROWSER PIXEL
+      if (BROWSER_PIXEL_ENABLED) {
+        // ✅ MODO HÍBRIDO: Browser + CAPI
+        window.fbq('track', eventName, enhancedParams, Object.keys(fbqOptions).length > 0 ? fbqOptions : undefined);
+        console.log(`🌐 Browser Pixel ATIVADO - ${eventName} enviado via browser`);
+      } else {
+        // ❌ MODO CAPI-ONLY: Apenas CAPI Gateway
+        console.log(`🚫 Browser Pixel DESATIVADO - ${eventName} enviado apenas via CAPI Gateway`);
+        // Não envia pelo browser, mas CAPI Gateway ainda recebe via server_event_uri
+      }
       
     } catch (error) {
       console.error('❌ Erro ao fazer trackMetaEvent com dados enriquecidos:', error);
@@ -196,7 +209,15 @@ export const trackMetaEvent = async (eventName: string, parameters?: object, ded
       };
       
       console.log('🔄 Usando fallback sem enriquecimento:', eventName, { event_id: fallbackEventID });
-      window.fbq('track', eventName, fallbackParams, { eventID: fallbackEventID });
+      
+      // 🎛️ CONTROLE DE ENVIO BROWSER PIXEL NO FALLBACK
+      if (BROWSER_PIXEL_ENABLED) {
+        window.fbq('track', eventName, fallbackParams, { eventID: fallbackEventID });
+        console.log(`🌐 Browser Pixel ATIVADO - ${eventName} fallback enviado via browser`);
+      } else {
+        console.log(`🚫 Browser Pixel DESATIVADO - ${eventName} fallback enviado apenas via CAPI Gateway`);
+        // Não envia pelo browser, mas CAPI Gateway ainda recebe
+      }
     }
   }
 };
@@ -267,8 +288,16 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
           event_id: pageViewEventID // ✅ Para deduplicação
         };
         
-        // Disparar PageView PADRÃO com dados comerciais e eventID
-        window.fbq('track', 'PageView', pageViewParams, { eventID: pageViewEventID });
+        // 🎛️ CONTROLE DE ENVIO PAGEVIEW PADRÃO
+        if (BROWSER_PIXEL_ENABLED) {
+          // ✅ MODO HÍBRIDO: Browser + CAPI
+          window.fbq('track', 'PageView', pageViewParams, { eventID: pageViewEventID });
+          console.log('🌐 Browser Pixel ATIVADO - PageView padrão enviado via browser');
+        } else {
+          // ❌ MODO CAPI-ONLY: Apenas CAPI Gateway
+          console.log('🚫 Browser Pixel DESATIVADO - PageView padrão enviado apenas via CAPI Gateway');
+          // Não envia pelo browser, mas CAPI Gateway ainda recebe via server_event_uri
+        }
         
         // Disparar evento separado com dados enriquecidos para CAPI
         try {
@@ -352,7 +381,16 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
           });
           
           // Disparar evento customizado com dados enriquecidos (não afeta PageView padrão)
-          window.fbq('trackCustom', 'PageViewEnriched', pageViewEnrichedParams, { eventID: pageViewEnrichedEventID });
+          // 🎛️ CONTROLE DE ENVIO PAGEVIEW ENRICHED
+          if (BROWSER_PIXEL_ENABLED) {
+            // ✅ MODO HÍBRIDO: Browser + CAPI
+            window.fbq('trackCustom', 'PageViewEnriched', pageViewEnrichedParams, { eventID: pageViewEnrichedEventID });
+            console.log('🌐 Browser Pixel ATIVADO - PageViewEnriched enviado via browser');
+          } else {
+            // ❌ MODO CAPI-ONLY: Apenas CAPI Gateway
+            console.log('🚫 Browser Pixel DESATIVADO - PageViewEnriched enviado apenas via CAPI Gateway');
+            // Não envia pelo browser, mas CAPI Gateway ainda recebe via server_event_uri
+          }
           
         } catch (error) {
           console.error('❌ Erro ao enriquecer PageView:', error);
