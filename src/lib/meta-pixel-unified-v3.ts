@@ -16,6 +16,9 @@
 import { getPersistedUserData, saveUserData, formatUserDataForMeta } from './userDataPersistence';
 import { getBestAvailableLocation } from './locationData';
 
+// 🎛️ CONTROLE DE BROWSER PIXEL (mesmo controle do MetaPixel.tsx)
+const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
+
 // Declarações globais
 declare global {
   interface Window {
@@ -207,19 +210,29 @@ async function fireEventWithDeduplication(
       send_to: 'pixel_id'
     };
     
-    // 5. Dispara evento
+    // 5. Dispara evento com controle de browser pixel
     if (typeof window !== 'undefined' && window.fbq) {
-      if (eventType === 'custom') {
-        window.fbq('trackCustom', eventName, params, options);
+      // 🎛️ CONTROLE DE ENVIO BROWSER PIXEL - Unified V3
+      if (BROWSER_PIXEL_ENABLED) {
+        // ✅ MODO HÍBRIDO: Browser + CAPI
+        if (eventType === 'custom') {
+          window.fbq('trackCustom', eventName, params, options);
+        } else {
+          window.fbq('track', eventName, params, options);
+        }
+        console.log(`🌐 Browser Pixel ATIVADO - ${eventName} Unified V3 enviado via browser`);
       } else {
-        window.fbq('track', eventName, params, options);
+        // ❌ MODO CAPI-ONLY: Apenas CAPI Gateway
+        console.log(`🚫 Browser Pixel DESATIVADO - ${eventName} Unified V3 enviado apenas via CAPI Gateway`);
+        // Não envia pelo browser, mas CAPI Gateway ainda recebe via server_event_uri
       }
       
-      console.log(`✅ ${eventName} disparado com sucesso:`);
+      console.log(`✅ ${eventName} processado com sucesso:`);
       console.log('  🆔 Event ID:', eventId);
       console.log('  📊 Dados pessoais:', !!(userData.em && userData.ph && userData.fn && userData.ln));
       console.log('  🌍 Dados geográficos:', !!(userData.ct && userData.st && userData.zip && userData.country));
       console.log('  🔑 Deduplicação:', '✅ Completa');
+      console.log('  🎛️ Browser Pixel:', BROWSER_PIXEL_ENABLED ? 'ATIVO' : 'INATIVO');
     }
     
     // 6. Salva registro local
