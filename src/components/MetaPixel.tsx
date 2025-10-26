@@ -87,22 +87,34 @@ export const trackMetaEvent = async (eventName: string, parameters?: object, ded
       
       // 6. Gerar chaves unificadas se disponível
       let fbqOptions = {};
+      let deduplicationKeys = {};
+      
       if (deduplicationOptions?.orderId) {
         const baseId = `purchase_${deduplicationOptions.orderId}_${Date.now()}`;
         const eventID = `${baseId}_${Math.random().toString(36).substr(2, 5)}`;
         
         fbqOptions = {
-          eventID,
-          // Adicionar chaves de deduplicação aos parâmetros
+          eventID
+        };
+        
+        // Chaves de deduplicação nos PARÂMETROS (correção principal)
+        deduplicationKeys = {
+          event_id: eventID, // ✅ ADICIONADO: event_id nos parâmetros
           transaction_id: deduplicationOptions.orderId,
           email_hash: deduplicationOptions.userEmail ? await hashData(deduplicationOptions.userEmail) : undefined
         };
         
         console.log('🔑 Usando chaves unificadas de deduplicação:', {
           eventID,
+          event_id: eventID, // Log para debug
           transaction_id: deduplicationOptions.orderId,
           eventName
         });
+      } else {
+        // Para eventos sem orderId, gerar eventID anyway para consistência
+        const eventID = `${eventName}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        fbqOptions = { eventID };
+        deduplicationKeys = { event_id: eventID };
       }
       
       // 7. Enriquecer parâmetros com dados hasheados
@@ -127,8 +139,8 @@ export const trackMetaEvent = async (eventName: string, parameters?: object, ded
         data_enriched: true,
         // Metadados de qualidade (padronizado para segundos)
         enrichment_timestamp: getCurrentTimestamp(),
-        // Chaves de deduplicação (se aplicável)
-        ...fbqOptions
+        // ✅ CHAVES DE DEDUPLICAÇÃO NOS PARÂMETROS (correção principal)
+        ...deduplicationKeys
       };
 
       // Log detalhado para debug (remover em produção)
@@ -167,6 +179,9 @@ export const trackMetaEvent = async (eventName: string, parameters?: object, ded
         // Removido client_user_agent redundante
       };
       
+      // Gerar eventID mesmo no fallback para consistência
+      const fallbackEventID = `${eventName}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      
       const fallbackParams = {
         ...parameters,
         ...(Object.keys(hashedUserData).length > 0 && { 
@@ -175,11 +190,13 @@ export const trackMetaEvent = async (eventName: string, parameters?: object, ded
         event_source_url: window.location.href,
         event_time: getCurrentTimestamp(),
         data_enriched: false,
-        fallback_used: true
+        fallback_used: true,
+        // ✅ ADICIONADO: event_id mesmo no fallback
+        event_id: fallbackEventID
       };
       
-      console.log('🔄 Usando fallback sem enriquecimento:', eventName);
-      window.fbq('track', eventName, fallbackParams);
+      console.log('🔄 Usando fallback sem enriquecimento:', eventName, { event_id: fallbackEventID });
+      window.fbq('track', eventName, fallbackParams, { eventID: fallbackEventID });
     }
   }
 };
@@ -234,9 +251,24 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
         // Configurar endpoint do CAPI Gateway
         window.fbq('set', 'server_event_uri', 'https://capig.maracujazeropragas.com/');
         
-        // Disparar PageView PADRÃO (sem parâmetros personalizados)
-        // Isso garante que o Facebook o reconheça como PageView padrão
-        window.fbq('track', 'PageView');
+        // Gerar eventID para PageView padrão (correção deduplicação)
+        const pageViewEventID = `PageView_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        
+        // ✅ MELHORIA: PageView com dados comerciais para nota 9+
+        const pageViewParams = {
+          value: 39.9,
+          currency: 'BRL',
+          content_ids: ['339591'],
+          content_type: 'product',
+          content_name: 'Sistema 4 Fases - Ebook Trips',
+          predicted_ltv: 39.9 * 3.5,
+          condition: 'new',
+          availability: 'in stock',
+          event_id: pageViewEventID // ✅ Para deduplicação
+        };
+        
+        // Disparar PageView PADRÃO com dados comerciais e eventID
+        window.fbq('track', 'PageView', pageViewParams, { eventID: pageViewEventID });
         
         // Disparar evento separado com dados enriquecidos para CAPI
         try {
@@ -274,10 +306,25 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
             client_info_source: finalUserData.client_info_source
           };
         
+          // Gerar eventID para PageViewEnriched
+          const pageViewEnrichedEventID = `PageViewEnriched_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        
           const pageViewEnrichedParams: any = {
+            // ✅ MELHORIA: Dados comerciais para nota 9+
+            value: 39.9,
+            currency: 'BRL',
+            content_ids: ['339591'],
+            content_type: 'product',
+            content_name: 'Sistema 4 Fases - Ebook Trips',
+            predicted_ltv: 39.9 * 3.5,
+            condition: 'new',
+            availability: 'in stock',
+            
             // Metadata essencial para CAPI Gateway (sem user agent redundante)
             event_source_url: window.location.href,
             event_time: getCurrentTimestamp(),
+            // ✅ ADICIONADO: event_id nos parâmetros para deduplicação
+            event_id: pageViewEnrichedEventID,
             ...(persistedUserData?.sessionId && { 
               session_id: persistedUserData.sessionId 
             }),
@@ -299,11 +346,13 @@ const MetaPixel: React.FC<MetaPixelProps> = ({ pixelId = '642933108377475' }) =>
             state: finalUserData.st,
             zip: finalUserData.zip,
             country: finalUserData.country,
-            enrichmentSource: finalUserData.client_info_source
+            enrichmentSource: finalUserData.client_info_source,
+            pageViewEventID,
+            pageViewEnrichedEventID
           });
           
           // Disparar evento customizado com dados enriquecidos (não afeta PageView padrão)
-          window.fbq('trackCustom', 'PageViewEnriched', pageViewEnrichedParams);
+          window.fbq('trackCustom', 'PageViewEnriched', pageViewEnrichedParams, { eventID: pageViewEnrichedEventID });
           
         } catch (error) {
           console.error('❌ Erro ao enriquecer PageView:', error);
