@@ -8,6 +8,7 @@ import OptimizedImage from '@/components/OptimizedImage';
 import { trackMetaEvent } from '@/components/MetaPixel';
 import { fireUnifiedLeadV3, fireUnifiedInitiateCheckoutV3 } from '@/lib/meta-pixel-unified-v3';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
+import { getCurrentMode } from '@/lib/capi-only-tracking';
 import DebugPersistence from '@/components/DebugPersistence';
 
 export default function App() {
@@ -38,6 +39,9 @@ export default function App() {
     state?: string;
     cep?: string;
   }>({});
+
+  // Estado para o modo de operação (CAPI-ONLY vs HÍBRIDO)
+  const [currentMode, setCurrentMode] = useState(getCurrentMode());
 
   // Inicializar dados persistidos ao montar o componente
   useEffect(() => {
@@ -304,7 +308,39 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-  
+      
+      {/* 🚀 Painel de Status CAPI-ONLY */}
+      <div className={`${
+        currentMode.browserPixelEnabled 
+          ? 'bg-yellow-50 border-yellow-200' 
+          : 'bg-green-50 border-green-200'
+      } border-b px-4 py-2 text-xs`}>
+        <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className={`font-bold ${
+              currentMode.browserPixelEnabled ? 'text-yellow-700' : 'text-green-700'
+            }`}>
+              🎛️ Meta Pixel: {currentMode.mode}
+            </span>
+            <span className={
+              currentMode.browserPixelEnabled ? 'text-yellow-600' : 'text-green-600'
+            }>
+              ({currentMode.browserPixelEnabled ? 'Browser + CAPI' : 'CAPI-ONLY API'})
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a 
+              href="/test-capi-only" 
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              Testar CAPI-ONLY
+            </a>
+            <span className="text-gray-500">
+              {currentMode.browserPixelEnabled ? '✅ Browser Ativo' : '🚫 Browser Inativo'}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Barra de Urgência - Otimizada para Mobile */}
       <div className="bg-red-600 text-white py-2 px-2 sm:px-4 text-center animate-pulse">

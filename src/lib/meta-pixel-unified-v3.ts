@@ -15,6 +15,14 @@
 
 import { getPersistedUserData, saveUserData, formatUserDataForMeta } from './userDataPersistence';
 import { getBestAvailableLocation } from './locationData';
+import { 
+  fireCAPIOnlyPageView, 
+  fireCAPIOnlyViewContent, 
+  fireCAPIOnlyScrollDepth, 
+  fireCAPIOnlyCTAClick, 
+  fireCAPIOnlyLead, 
+  fireCAPIOnlyInitiateCheckout 
+} from './capi-only-tracking';
 
 // 🎛️ CONTROLE DE BROWSER PIXEL (mesmo controle do MetaPixel.tsx)
 const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
@@ -148,6 +156,52 @@ async function getCompleteUserData(): Promise<any> {
 }
 
 /**
+ * Envia evento diretamente para API CAPI-ONLY (função local)
+ */
+async function sendEventToCAPIOnly(
+  eventName: string,
+  params: any = {},
+  eventType: 'standard' | 'custom' = 'standard'
+): Promise<any> {
+  try {
+    // Preparar parâmetros para API
+    const apiParams = {
+      value: params.value || 39.9,
+      currency: params.currency || 'BRL',
+      content_ids: params.content_ids || ['339591'],
+      content_type: params.content_type || 'product',
+      content_name: params.content_name || 'Sistema 4 Fases - Ebook Trips',
+      event_source_url: params.event_source_url || (typeof window !== 'undefined' ? window.location.href : ''),
+      ...params
+    };
+
+    // Enviar para nossa API
+    const response = await fetch('/api/capi-events', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        eventName,
+        eventType,
+        params: apiParams
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+
+  } catch (error) {
+    console.error(`❌ Erro ao enviar ${eventName} via CAPI-ONLY:`, error);
+    throw error;
+  }
+}
+
+/**
  * Dispara evento com deduplicação e dados completos
  */
 async function fireEventWithDeduplication(
@@ -222,9 +276,16 @@ async function fireEventWithDeduplication(
         }
         console.log(`🌐 Browser Pixel ATIVADO - ${eventName} Unified V3 enviado via browser`);
       } else {
-        // ❌ MODO CAPI-ONLY: Apenas CAPI Gateway
-        console.log(`🚫 Browser Pixel DESATIVADO - ${eventName} Unified V3 enviado apenas via CAPI Gateway`);
-        // Não envia pelo browser, mas CAPI Gateway ainda recebe via server_event_uri
+        // ❌ MODO CAPI-ONLY: Envia via API CAPI-ONLY
+        console.log(`🚫 Browser Pixel DESATIVADO - ${eventName} Unified V3 enviado via API CAPI-ONLY`);
+        
+        // Envia via API CAPI-ONLY em vez do browser
+        try {
+          const capiResult = await sendEventToCAPIOnly(eventName, params, eventType);
+          console.log(`✅ ${eventName} enviado via CAPI-ONLY:`, capiResult);
+        } catch (capiError) {
+          console.error(`❌ Erro ao enviar ${eventName} via CAPI-ONLY:`, capiError);
+        }
       }
       
       console.log(`✅ ${eventName} processado com sucesso:`);
@@ -233,6 +294,7 @@ async function fireEventWithDeduplication(
       console.log('  🌍 Dados geográficos:', !!(userData.ct && userData.st && userData.zip && userData.country));
       console.log('  🔑 Deduplicação:', '✅ Completa');
       console.log('  🎛️ Browser Pixel:', BROWSER_PIXEL_ENABLED ? 'ATIVO' : 'INATIVO');
+      console.log('  🚀 Modo:', BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY');
     }
     
     // 6. Salva registro local
