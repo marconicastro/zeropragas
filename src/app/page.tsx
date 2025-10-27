@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
-import { trackMetaEvent } from '@/components/MetaPixel';
-import { fireUnifiedLeadV3, fireUnifiedInitiateCheckoutV3 } from '@/lib/meta-pixel-unified-v3';
+import { fireScrollDepthDefinitivo, fireViewContentDefinitivo, fireCTAClickDefinitivo } from '@/lib/meta-pixel-definitivo';
+import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
-import { getCurrentMode } from '@/lib/capi-only-tracking';
+import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
 import DebugPersistence from '@/components/DebugPersistence';
 
 export default function App() {
@@ -40,8 +40,8 @@ export default function App() {
     cep?: string;
   }>({});
 
-  // Estado para o modo de operação (CAPI-ONLY vs HÍBRIDO)
-  const [currentMode, setCurrentMode] = useState(getCurrentMode());
+  // Estado para o modo de operação (SISTEMA DEFINITIVO)
+  const [currentMode, setCurrentMode] = useState(getCurrentModeDefinitivo());
 
   // Inicializar dados persistidos ao montar o componente
   useEffect(() => {
@@ -85,13 +85,13 @@ export default function App() {
 
       // Disparar evento de 50% do scroll
       if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
-        await trackMetaEvent('ScrollDepth', { percent: 50 });
+        await fireScrollDepthDefinitivo(50);
         setScrollEventsFired(prev => ({ ...prev, '50': true }));
       }
 
       // Disparar evento de 75% do scroll
       if (scrollPercentage >= 75 && !scrollEventsFired['75']) {
-        await trackMetaEvent('ScrollDepth', { percent: 75 });
+        await fireScrollDepthDefinitivo(75);
         setScrollEventsFired(prev => ({ ...prev, '75': true }));
       }
     };
@@ -105,20 +105,18 @@ export default function App() {
     // Disparar ViewContent após 15 segundos na página (indica interesse real)
     const viewContentTimer = setTimeout(async () => {
       if (!viewContentFired) {
-        await trackMetaEvent('ViewContent', {
+        await fireViewContentDefinitivo({
           content_name: 'Sistema 4 Fases - Ebook Trips',
           content_ids: ['339591'],
           value: 39.90,
           currency: 'BRL',
           content_type: 'product',
-          custom_data: {
-            trigger_type: 'timing',
-            time_on_page: 15
-          }
+          trigger_type: 'timing',
+          time_on_page: 15
         });
         
         setViewContentFired(true);
-        console.log('🎯 ViewContent disparado por timing (15s)');
+        console.log('🎯 ViewContent disparado por timing (15s) - Sistema Definitivo');
       }
     }, 15000); // 15 segundos
 
@@ -130,20 +128,18 @@ export default function App() {
         const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
 
         if (scrollPercentage >= 25) {
-          await trackMetaEvent('ViewContent', {
+          await fireViewContentDefinitivo({
             content_name: 'Sistema 4 Fases - Ebook Trips',
             content_ids: ['339591'],
             value: 39.90,
             currency: 'BRL',
             content_type: 'product',
-            custom_data: {
-              trigger_type: 'scroll',
-              scroll_depth: 25
-            }
+            trigger_type: 'scroll',
+            scroll_depth: 25
           });
           
           setViewContentFired(true);
-          console.log('🎯 ViewContent disparado por scroll (25%)');
+          console.log('🎯 ViewContent disparado por scroll (25%) - Sistema Definitivo');
           
           // Remover listener após disparar
           window.removeEventListener('scroll', handleScrollForViewContent);
@@ -225,9 +221,8 @@ export default function App() {
       additionalParams['zip'] = formData.cep.replace(/\D/g, '');
     }
 
-    // Disparar evento Lead com sistema unificado de deduplicação
-    await fireUnifiedLeadV3({
-      // Mantendo exatamente os mesmos parâmetros
+    // Disparar evento Lead com sistema definitivo
+    await fireLeadDefinitivo({
       content_name: 'Lead - Formulário Preenchido',
       content_category: 'Formulário',
       value: 15.00,
@@ -239,9 +234,8 @@ export default function App() {
       }
     });
 
-    // Disparar evento InitiateCheckout com sistema unificado de deduplicação
-    await fireUnifiedInitiateCheckoutV3({
-      // Mantendo exatamente os mesmos parâmetros
+    // Disparar evento InitiateCheckout com sistema definitivo
+    await fireInitiateCheckoutDefinitivo({
       value: 39.90,
       currency: 'BRL',
       content_name: 'Sistema 4 Fases - Ebook Trips',
@@ -271,17 +265,14 @@ export default function App() {
   };
 
   const scrollToCheckout = async () => {
-    // Disparar evento específico de CTA (não ViewContent para evitar duplicidade)
-    await trackMetaEvent('CTAClick', {
-      content_name: 'CTA - Quero Economizar',
+    // Disparar evento específico de CTA
+    await fireCTAClickDefinitivo('Quero Economizar', {
       content_ids: ['339591'],
       value: 39.90,
       currency: 'BRL',
       content_type: 'product',
-      custom_data: {
-        cta_type: 'main_checkout_scroll',
-        action: 'scroll_to_checkout'
-      }
+      cta_type: 'main_checkout_scroll',
+      action: 'scroll_to_checkout'
     });
     
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
@@ -289,17 +280,14 @@ export default function App() {
 
   // Função principal de checkout (REDIRECIONAMENTO)
   const handleCheckoutRedirect = async (event) => {
-    // Disparar evento específico de CTA final (não ViewContent para evitar duplicidade)
-    await trackMetaEvent('CTAClick', {
-      content_name: 'CTA - Final Checkout',
+    // Disparar evento específico de CTA final
+    await fireCTAClickDefinitivo('Final Checkout', {
       content_ids: ['339591'],
       value: 39.90,
       currency: 'BRL',
       content_type: 'product',
-      custom_data: {
-        cta_type: 'final_checkout_modal',
-        action: 'open_modal'
-      }
+      cta_type: 'final_checkout_modal',
+      action: 'open_modal'
     });
     
     // Redirecionar para o novo fluxo com modal
@@ -309,7 +297,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white">
       
-      {/* 🚀 Painel de Status CAPI-ONLY */}
+      {/* 🚀 Painel de Status - SISTEMA DEFINITIVO */}
       <div className={`${
         currentMode.browserPixelEnabled 
           ? 'bg-yellow-50 border-yellow-200' 
@@ -320,12 +308,15 @@ export default function App() {
             <span className={`font-bold ${
               currentMode.browserPixelEnabled ? 'text-yellow-700' : 'text-green-700'
             }`}>
-              🎛️ Meta Pixel: {currentMode.mode}
+              🎯 SISTEMA DEFINITIVO: {currentMode.mode}
             </span>
             <span className={
               currentMode.browserPixelEnabled ? 'text-yellow-600' : 'text-green-600'
             }>
-              ({currentMode.browserPixelEnabled ? 'Browser + CAPI' : 'CAPI-ONLY API'})
+              ({currentMode.browserPixelEnabled ? 'Browser + CAPI' : 'CAPI-ONLY'})
+            </span>
+            <span className="text-purple-600 font-semibold">
+              📈 Nota: {currentMode.nota}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -333,10 +324,10 @@ export default function App() {
               href="/test-capi-only" 
               className="text-blue-600 hover:text-blue-800 underline"
             >
-              Testar CAPI-ONLY
+              Testar Sistema
             </a>
             <span className="text-gray-500">
-              {currentMode.browserPixelEnabled ? '✅ Browser Ativo' : '🚫 Browser Inativo'}
+              {currentMode.browserPixelEnabled ? '✅ Browser Ativo' : '🚫 CAPI-ONLY'}
             </span>
           </div>
         </div>
