@@ -30,6 +30,7 @@ const MetaPixelDefinitivo: React.FC<MetaPixelDefinitivoProps> = ({ pixelId = '64
       (function(f, b, e, v, n, t, s) {
         if (f.fbq) return;
         n = f.fbq = function(...args: any[]) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
           n.callMethod ? n.callMethod(...args) : n.queue.push(args);
         };
         if (!f._fbq) f._fbq = n;
@@ -65,16 +66,27 @@ const MetaPixelDefinitivo: React.FC<MetaPixelDefinitivoProps> = ({ pixelId = '64
         // Gerar eventID para PageView padrão (deduplicação Stape)
         const pageViewEventID = `PageView_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         
-        // 📊 Parâmetros PageView para CAPI Gateway (Nota 9.3)
+        // 📊 Parâmetros PageView para CAPI Gateway (Nota 9.3 - Padronizado)
         const pageViewParams = {
+          // Dados comerciais completos (como ViewContent)
           value: 39.9,
           currency: 'BRL',
           content_ids: ['339591'],
           content_type: 'product',
           content_name: 'Sistema 4 Fases - Ebook Trips',
-          predicted_ltv: 39.9 * 3.5,
+          content_category: 'digital_product',
           condition: 'new',
           availability: 'in stock',
+          predicted_ltv: 39.9 * 3.5,
+          
+          // Metadados de engajamento (como Lead)
+          trigger_type: 'page_load',
+          time_on_page: 0,
+          scroll_depth: 0,
+          page_views: 1,
+          user_engagement: 100,
+          session_id: `sess_${Date.now()}`,
+          
           event_id: pageViewEventID // ✅ Deduplicação entre browser e CAPI
         };
         

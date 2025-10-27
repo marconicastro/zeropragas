@@ -297,42 +297,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white">
       
-      {/* 🚀 Painel de Status - SISTEMA DEFINITIVO */}
-      <div className={`${
-        currentMode.browserPixelEnabled 
-          ? 'bg-yellow-50 border-yellow-200' 
-          : 'bg-green-50 border-green-200'
-      } border-b px-4 py-2 text-xs`}>
-        <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className={`font-bold ${
-              currentMode.browserPixelEnabled ? 'text-yellow-700' : 'text-green-700'
-            }`}>
-              🎯 SISTEMA DEFINITIVO: {currentMode.mode}
-            </span>
-            <span className={
-              currentMode.browserPixelEnabled ? 'text-yellow-600' : 'text-green-600'
-            }>
-              ({currentMode.browserPixelEnabled ? 'Browser + CAPI' : 'CAPI-ONLY'})
-            </span>
-            <span className="text-purple-600 font-semibold">
-              📈 Nota: {currentMode.nota}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <a 
-              href="/test-capi-only" 
-              className="text-blue-600 hover:text-blue-800 underline"
-            >
-              Testar Sistema
-            </a>
-            <span className="text-gray-500">
-              {currentMode.browserPixelEnabled ? '✅ Browser Ativo' : '🚫 CAPI-ONLY'}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Barra de Urgência - Otimizada para Mobile */}
       <div className="bg-red-600 text-white py-2 px-2 sm:px-4 text-center animate-pulse">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm font-bold">
