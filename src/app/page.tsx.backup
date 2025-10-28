@@ -7,35 +7,11 @@ import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
 import { fireScrollDepthDefinitivo, fireViewContentDefinitivo, fireCTAClickDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-pixel-definitivo';
-import { MetaAdvancedEvents } from '@/lib/meta-advanced-events';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
-
-import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
-import { useUTMs } from '@/hooks/use-utm';
-import { useUTMsV2 } from '@/hooks/use-utm-v2';
+import DebugPersistence from '@/components/DebugPersistence';
 
 export default function App() {
-  // 🎯 Hook de UTMs - Sistema próprio e seguro (v1.0)
-  const { 
-    utms, 
-    primaryUTMs, 
-    hasUTMs, 
-    addToURL, 
-    toURLString, 
-    getSource, 
-    getCampaign, 
-    isAffiliateTraffic 
-  } = useUTMs();
-
-  // 🆕 Hook de UTMs v2.0 - Com suporte para e-commerce
-  const { 
-    checkoutData, 
-    hasCheckoutData,
-    hasEcommerceData,
-    ecommerceData
-  } = useUTMsV2();
-
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 47,
@@ -53,9 +29,6 @@ export default function App() {
 
   // Estado para controle de ViewContent (EVITAR DUPLICIDADE)
   const [viewContentFired, setViewContentFired] = useState(false);
-  
-  // Timestamp para cálculo de tempo na página
-  const [startTime] = useState(Date.now());
 
   // Estado para dados do usuário (agora com persistência)
   const [userData, setUserData] = useState<{
@@ -114,21 +87,6 @@ export default function App() {
       if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
         await fireScrollDepthDefinitivo(50);
         setScrollEventsFired(prev => ({ ...prev, '50': true }));
-        
-        // 🎯 ViewContent avançado no scroll 50% (APENAS UMA VEZ)
-        if (!viewContentFired) {
-          await MetaAdvancedEvents.fireViewContentAdvanced({
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['339591'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            trigger_type: 'scroll_50',
-            scroll_depth: 50,
-            time_on_page: Math.floor((Date.now() - startTime) / 1000)
-          });
-          setViewContentFired(true);
-        }
       }
 
       // Disparar evento de 75% do scroll
@@ -140,7 +98,7 @@ export default function App() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [scrollEventsFired, viewContentFired, startTime]);
+  }, [scrollEventsFired]);
 
   // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
   useEffect(() => {
@@ -157,20 +115,8 @@ export default function App() {
           time_on_page: 15
         });
         
-        // 🎯 ViewContent avançado após 15s (APENAS UMA VEZ)
-        await MetaAdvancedEvents.fireViewContentAdvanced({
-          content_name: 'Sistema 4 Fases - Ebook Trips',
-          content_ids: ['339591'],
-          value: 39.90,
-          currency: 'BRL',
-          content_type: 'product',
-          trigger_type: 'timing_15s',
-          time_on_page: 15,
-          scroll_depth: 0
-        });
-        
         setViewContentFired(true);
-        console.log('🎯 ViewContent disparado por timing (15s) - Sistema Definitivo + Avançado');
+        console.log('🎯 ViewContent disparado por timing (15s) - Sistema Definitivo');
       }
     }, 15000); // 15 segundos
 
@@ -192,20 +138,8 @@ export default function App() {
             scroll_depth: 25
           });
           
-          // 🎯 ViewContent avançado no scroll 25% (APENAS UMA VEZ)
-          await MetaAdvancedEvents.fireViewContentAdvanced({
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['339591'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            trigger_type: 'scroll_25',
-            scroll_depth: 25,
-            time_on_page: Math.floor((Date.now() - startTime) / 1000)
-          });
-          
           setViewContentFired(true);
-          console.log('🎯 ViewContent disparado por scroll (25%) - Sistema Definitivo + Avançado');
+          console.log('🎯 ViewContent disparado por scroll (25%) - Sistema Definitivo');
           
           // Remover listener após disparar
           window.removeEventListener('scroll', handleScrollForViewContent);
@@ -231,17 +165,6 @@ export default function App() {
   const handlePreCheckoutSubmit = async (formData) => {
     console.log('🚀 Dados recebidos do formulário:', formData);
     
-    // Gerar identificadores únicos enterprise PRIMEIRO
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substr(2, 5);
-    
-    const enterpriseIds = {
-      user_id: `user_${timestamp}_${randomSuffix}`,
-      session_id: `sess_${timestamp}_${randomSuffix}`,
-      event_id: `InitiateCheckout_${timestamp}_${randomSuffix}`,
-      timestamp: timestamp.toString()
-    };
-    
     // Processamento rápido dos dados essenciais
     const cleanFullName = formData.fullName
       .trim()
@@ -253,98 +176,14 @@ export default function App() {
     // Formatação rápida do telefone
     const phoneClean = formData.phone.replace(/\D/g, '');
     
-    // ✅ ESTRATÉGIA SEGURA: MÍNIMO NA URL + DADOS COMPLETOS NO BACKUP
-    // Apenas IDs e dados comerciais (sem informações pessoais)
-    const secureParams: Record<string, string> = {};
-    
-    // Identificadores para cross-reference (apenas IDs)
-    secureParams['session_id'] = enterpriseIds.session_id;
-    secureParams['event_id'] = enterpriseIds.event_id;
-    
-    // Dados comerciais (sem informações pessoais)
-    secureParams['product_id'] = '339591';
-    secureParams['value'] = '39.90';
-    secureParams['currency'] = 'BRL';
-    
-    // 🎯 UTMs do nosso sistema próprio (apenas os principais)
-    if (hasUTMs) {
-      Object.entries(primaryUTMs).forEach(([key, value]) => {
-        if (value) {
-          secureParams[key] = value;
-        }
-      });
-    }
-    
-    // Metadados de rastreamento
-    secureParams['source'] = 'maracujazeropragas';
-    secureParams['campaign'] = 'sistema_4_fases_v2';
-    
-    // ✅ URL DE RETORNO CORRIGIDA (produção)
-    secureParams['success_url'] = `${window.location.origin}/obrigado`;
-    secureParams['cancel_url'] = `${window.location.origin}/checkout`;
-    
-    // ✅ DADOS COMPLETOS E SEGUROS no backup (localStorage + server-side)
-    const secureDataBackup = {
-      // Dados PESSOAIS (protegidos - NÃO vão na URL)
-      personal_data: {
-        name: cleanFullName,
-        email: formData.email,
-        phone: phoneClean,
-        phone_formatted: phoneClean.length >= 10 ? phoneClean.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3') : null,
-        city: formData.city?.trim(),
-        state: formData.state?.trim(),
-        cep: formData.cep?.replace(/\D/g, '') || null
-      },
-      
-      // Identificadores enterprise
-      tracking_ids: enterpriseIds,
-      
-      // 🎯 UTMs completos (backup para análise)
-      utm_data: hasUTMs ? {
-        all: utms,
-        primary: primaryUTMs,
-        source: getSource,
-        campaign: getCampaign,
-        is_affiliate: isAffiliateTraffic()
-      } : null,
-      
-      // Dados comerciais completos
-      commercial_data: {
-        product_id: '339591',
-        product_name: 'Sistema 4 Fases - Ebook Trips',
-        content_type: 'product',
-        value: 39.90,
-        currency: 'BRL'
-      },
-      
-      // URLs de produção
-      urls: {
-        success_url: `${window.location.origin}/obrigado`,
-        cancel_url: `${window.location.origin}/checkout`
-      },
-      
-      // Metadados de qualidade
-      metadata: {
-        source: 'maracujazeropragas',
-        campaign: 'sistema_4_fases_v2',
-        quality_score: '9.3',
-        server_event_uri: 'https://capig.maracujazeropragas.com/',
-        timestamp: timestamp
-      }
-    };
-    
-    // Salvar dados PERSISTENTEMENTE com nível enterprise (com consentimento implícito ao preencher formulário)
+    // Salvar dados PERSISTENTEMENTE (com consentimento implícito ao preencher formulário)
     const userDataToSave = {
       email: formData.email,
       phone: phoneClean,
       fullName: cleanFullName,
       city: formData.city?.trim(),
       state: formData.state?.trim(),
-      cep: formData.cep?.replace(/\D/g, ''),
-      
-      // ✅ DADOS SEGUROS COMPLETOS PARA BACKUP
-      secure_data: secureDataBackup,
-      timestamp: timestamp
+      cep: formData.cep?.replace(/\D/g, '')
     };
     
     saveUserData(userDataToSave, true); // Consentimento verdadeiro ao preencher formulário
@@ -352,20 +191,35 @@ export default function App() {
     // Atualizar estado local
     setUserData(userDataToSave);
     
-    console.log('💾 Dados seguros salvos persistentemente:', userDataToSave);
+    console.log('💾 Dados salvos persistentemente:', userDataToSave);
     
-    // ✅ NOVO: Salvar dados completos para backup de Purchase
-    const purchaseIntent = {
-      ...userDataToSave,
-      product_id: '339591',
-      value: 39.90,
-      currency: 'BRL',
-      product_name: 'Sistema 4 Fases - Ebook Trips',
-      secure_params: Object.keys(secureParams).map(key => `${key}=${secureParams[key]}`).join('&')
-    };
+    // Capturar apenas parâmetros essenciais para o checkout
+    const additionalParams: Record<string, string> = {};
+    additionalParams['name'] = cleanFullName;
+    additionalParams['email'] = formData.email;
     
-    localStorage.setItem('userPurchaseIntent', JSON.stringify(purchaseIntent));
-    console.log('🎯 Purchase Intent salvo para backup:', purchaseIntent.email);
+    // Formatação rápida do telefone (já existe phoneClean do estado userData)
+    if (phoneClean.length >= 10 && phoneClean.length <= 11) {
+      const ddd = phoneClean.substring(0, 2);
+      const numeroCompleto = phoneClean.substring(2);
+      
+      if (numeroCompleto.length === 9) {
+        const primeiraParte = numeroCompleto.substring(0, 5);
+        const segundaParte = numeroCompleto.substring(5);
+        additionalParams['phone_number'] = `${ddd} ${primeiraParte}-${segundaParte}`;
+      } else if (numeroCompleto.length === 8) {
+        const primeiraParte = numeroCompleto.substring(0, 4);
+        const segundaParte = numeroCompleto.substring(4);
+        additionalParams['phone_number'] = `${ddd} ${primeiraParte}-${segundaParte}`;
+      }
+    }
+
+    // Adicionar dados de localização se existirem
+    if (formData.city?.trim()) additionalParams['city'] = formData.city.trim();
+    if (formData.state?.trim()) additionalParams['state'] = formData.state.trim();
+    if (formData.cep?.replace(/\D/g, '').length === 8) {
+      additionalParams['zip'] = formData.cep.replace(/\D/g, '');
+    }
 
     // Disparar evento Lead com sistema definitivo
     await fireLeadDefinitivo({
@@ -377,26 +231,6 @@ export default function App() {
         em: formData.email,
         ph: phoneClean,
         fn: cleanFullName
-      }
-    });
-
-    // 🎯 NOVO: Lead avançado com dados completos
-    await MetaAdvancedEvents.fireLeadAdvanced({
-      content_name: 'Lead - Sistema 4 Fases',
-      content_category: 'pre_checkout_form',
-      value: 15.00,
-      currency: 'BRL',
-      email: formData.email,
-      phone: phoneClean,
-      fullName: cleanFullName,
-      city: formData.city,
-      state: formData.state,
-      zipCode: formData.cep,
-      custom_data: {
-        form_name: 'pre_checkout_modal',
-        lead_type: 'high_intent',
-        form_position: 'modal',
-        user_engagement_time: Math.floor((Date.now() - startTime) / 1000)
       }
     });
 
@@ -418,55 +252,12 @@ export default function App() {
       }
     });
 
-    // 🎯 NOVO: InitiateCheckout avançado com dados enterprise
-    await MetaAdvancedEvents.fireInitiateCheckoutAdvanced({
-      content_name: 'Sistema 4 Fases - Ebook Trips',
-      content_ids: ['339591'],
-      value: 39.90,
-      currency: 'BRL',
-      content_type: 'product',
-      email: formData.email,
-      phone: phoneClean,
-      fullName: cleanFullName,
-      city: formData.city,
-      state: formData.state,
-      zipCode: formData.cep,
-      custom_data: {
-        checkout_step: 1,
-        payment_method_available: ['credit_card', 'pix'],
-        num_items: 1,
-        delivery_type: 'digital_download',
-        order_type: 'online_purchase',
-        product_category: 'digital_guide',
-        user_engagement_time: Math.floor((Date.now() - startTime) / 1000),
-        form_completion_time: 30, // segundos estimados
-        checkout_type: 'modal_redirect'
-      }
-    });
-
-    // Construir URL final SEGURA (apenas IDs e dados comerciais)
+    // Construir URL final rapidamente
     // LINK ATUALIZADO: https://go.allpes.com.br/r1wl4qyyfv (novo link de pagamento)
-    const finalUrlString = `https://go.allpes.com.br/r1wl4qyyfv?${new URLSearchParams(secureParams).toString()}`;
+    const finalUrlString = `https://go.allpes.com.br/r1wl4qyyfv?${new URLSearchParams(additionalParams).toString()}`;
     
-    console.log('🔗 URL SEGURA gerada:', finalUrlString);
-    console.log('📊 Tamanho da URL:', finalUrlString.length, 'caracteres');
-    console.log('🛡️ Dados pessoais protegidos no backup:', secureDataBackup.personal_data);
-    console.log('🔗 Cross-reference mantido via IDs:', secureParams.session_id, secureParams.event_id);
-    
-    // 🎯 Logs de UTMs
-    if (hasUTMs) {
-      console.log('🎯 UTMs capturados e adicionados:', {
-        primary: primaryUTMs,
-        source: getSource,
-        campaign: getCampaign,
-        isAffiliate: isAffiliateTraffic()
-      });
-    } else {
-      console.log('📊 Nenhum UTM detectado na sessão atual');
-    }
-    
-    // Simular processamento mínimo (para UX)
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simular processamento
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Fechar modal e redirecionar
     setIsPreCheckoutModalOpen(false);
@@ -1171,6 +962,9 @@ export default function App() {
         onClose={() => setIsPreCheckoutModalOpen(false)}
         onSubmit={handlePreCheckoutSubmit}
       />
+
+      {/* Componente de Debug (apenas desenvolvimento) */}
+      {process.env.NODE_ENV === 'development' && <DebugPersistence />}
     </div>
   );
 }
