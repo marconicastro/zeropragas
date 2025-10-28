@@ -7,7 +7,6 @@ import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
 import { fireScrollDepthDefinitivo, fireViewContentDefinitivo, fireCTAClickDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-pixel-definitivo';
-import { MetaAdvancedEvents } from '@/lib/meta-advanced-events';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
 
@@ -114,21 +113,6 @@ export default function App() {
       if (scrollPercentage >= 50 && !scrollEventsFired['50']) {
         await fireScrollDepthDefinitivo(50);
         setScrollEventsFired(prev => ({ ...prev, '50': true }));
-        
-        // 🎯 ViewContent avançado no scroll 50% (APENAS UMA VEZ)
-        if (!viewContentFired) {
-          await MetaAdvancedEvents.fireViewContentAdvanced({
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['339591'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            trigger_type: 'scroll_50',
-            scroll_depth: 50,
-            time_on_page: Math.floor((Date.now() - startTime) / 1000)
-          });
-          setViewContentFired(true);
-        }
       }
 
       // Disparar evento de 75% do scroll
@@ -140,76 +124,45 @@ export default function App() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [scrollEventsFired, viewContentFired, startTime]);
+  }, [scrollEventsFired]);
 
-  // useEffect para ViewContent baseado em timing (EVITAR DUPLICIDADE)
+  // useEffect para ViewContent UNIFICADO (APENAS UM DISPARO)
   useEffect(() => {
-    // Disparar ViewContent após 15 segundos na página (indica interesse real)
-    const viewContentTimer = setTimeout(async () => {
-      if (!viewContentFired) {
-        await fireViewContentDefinitivo({
-          content_name: 'Sistema 4 Fases - Ebook Trips',
-          content_ids: ['339591'],
-          value: 39.90,
-          currency: 'BRL',
-          content_type: 'product',
-          trigger_type: 'timing',
-          time_on_page: 15
-        });
-        
-        // 🎯 ViewContent avançado após 15s (APENAS UMA VEZ)
-        await MetaAdvancedEvents.fireViewContentAdvanced({
-          content_name: 'Sistema 4 Fases - Ebook Trips',
-          content_ids: ['339591'],
-          value: 39.90,
-          currency: 'BRL',
-          content_type: 'product',
-          trigger_type: 'timing_15s',
-          time_on_page: 15,
-          scroll_depth: 0
-        });
-        
-        setViewContentFired(true);
-        console.log('🎯 ViewContent disparado por timing (15s) - Sistema Definitivo + Avançado');
-      }
-    }, 15000); // 15 segundos
+    // Função unificada para disparar ViewContent (sistema definitivo apenas)
+    const fireViewContentOnce = async (triggerType: string, additionalData: any = {}) => {
+      if (viewContentFired) return;
+      
+      console.log(`🎯 ViewContent disparado por ${triggerType} - Sistema Definitivo`);
+      
+      await fireViewContentDefinitivo({
+        content_name: 'Sistema 4 Fases - Ebook Trips',
+        content_ids: ['339591'],
+        value: 39.90,
+        currency: 'BRL',
+        content_type: 'product',
+        trigger_type: triggerType,
+        time_on_page: Math.floor((Date.now() - startTime) / 1000),
+        ...additionalData
+      });
+      
+      setViewContentFired(true);
+      console.log('✅ ViewContent disparado com sucesso - Bloqueando disparos adicionais');
+    };
 
-    // Disparar ViewContent ao atingir 25% de scroll (engajamento inicial)
+    // Estratégia 1: Disparar após 15 segundos (prioridade máxima)
+    const viewContentTimer = setTimeout(() => {
+      fireViewContentOnce('timing_15s');
+    }, 15000);
+
+    // Estratégia 2: Disparar ao atingir 25% de scroll (backup)
     const handleScrollForViewContent = async () => {
-      if (!viewContentFired) {
-        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPosition = window.scrollY;
-        const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollPosition = window.scrollY;
+      const scrollPercentage = Math.round((scrollPosition / scrollHeight) * 100);
 
-        if (scrollPercentage >= 25) {
-          await fireViewContentDefinitivo({
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['339591'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            trigger_type: 'scroll',
-            scroll_depth: 25
-          });
-          
-          // 🎯 ViewContent avançado no scroll 25% (APENAS UMA VEZ)
-          await MetaAdvancedEvents.fireViewContentAdvanced({
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: ['339591'],
-            value: 39.90,
-            currency: 'BRL',
-            content_type: 'product',
-            trigger_type: 'scroll_25',
-            scroll_depth: 25,
-            time_on_page: Math.floor((Date.now() - startTime) / 1000)
-          });
-          
-          setViewContentFired(true);
-          console.log('🎯 ViewContent disparado por scroll (25%) - Sistema Definitivo + Avançado');
-          
-          // Remover listener após disparar
-          window.removeEventListener('scroll', handleScrollForViewContent);
-        }
+      if (scrollPercentage >= 25 && !viewContentFired) {
+        fireViewContentOnce('scroll_25', { scroll_depth: 25 });
+        window.removeEventListener('scroll', handleScrollForViewContent);
       }
     };
 
@@ -219,7 +172,7 @@ export default function App() {
       clearTimeout(viewContentTimer);
       window.removeEventListener('scroll', handleScrollForViewContent);
     };
-  }, [viewContentFired]);
+  }, [viewContentFired, startTime]);
 
   // Função para abrir o modal de pré-checkout
   const openPreCheckoutModal = (event) => {
@@ -377,21 +330,7 @@ export default function App() {
         em: formData.email,
         ph: phoneClean,
         fn: cleanFullName
-      }
-    });
-
-    // 🎯 NOVO: Lead avançado com dados completos
-    await MetaAdvancedEvents.fireLeadAdvanced({
-      content_name: 'Lead - Sistema 4 Fases',
-      content_category: 'pre_checkout_form',
-      value: 15.00,
-      currency: 'BRL',
-      email: formData.email,
-      phone: phoneClean,
-      fullName: cleanFullName,
-      city: formData.city,
-      state: formData.state,
-      zipCode: formData.cep,
+      },
       custom_data: {
         form_name: 'pre_checkout_modal',
         lead_type: 'high_intent',
@@ -415,22 +354,7 @@ export default function App() {
         ...(formData.city && { ct: formData.city.trim() }),
         ...(formData.state && { st: formData.state.trim() }),
         ...(formData.cep && { zip: formData.cep.replace(/\D/g, '') })
-      }
-    });
-
-    // 🎯 NOVO: InitiateCheckout avançado com dados enterprise
-    await MetaAdvancedEvents.fireInitiateCheckoutAdvanced({
-      content_name: 'Sistema 4 Fases - Ebook Trips',
-      content_ids: ['339591'],
-      value: 39.90,
-      currency: 'BRL',
-      content_type: 'product',
-      email: formData.email,
-      phone: phoneClean,
-      fullName: cleanFullName,
-      city: formData.city,
-      state: formData.state,
-      zipCode: formData.cep,
+      },
       custom_data: {
         checkout_step: 1,
         payment_method_available: ['credit_card', 'pix'],

@@ -18,6 +18,7 @@ import { getPersistedUserData, saveUserData, formatUserDataForMeta } from './use
 import { getBestAvailableLocation } from './locationData';
 import { getEnrichedClientData } from './clientInfoService';
 import { getCurrentTimestamp } from './timestampUtils';
+import { FacebookUTMParser } from './facebook-utm-parser';
 
 // 🎛️ CONTROLE DE MODO (Mantido exatamente como estava)
 const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
@@ -159,6 +160,113 @@ async function getCompleteUserData(): Promise<any> {
 }
 
 /**
+ * 🚀 Enriquecimento Avançado para todos os eventos
+ */
+async function getAdvancedEnrichment(): Promise<any> {
+  try {
+    // Extrair UTMs do Facebook
+    const facebookUTMs = FacebookUTMParser.parseFacebookUTMs(
+      typeof window !== 'undefined' ? window.location.href : ''
+    );
+    
+    const metaEventData = facebookUTMs ? FacebookUTMParser.extractMetaEventData(facebookUTMs) : {};
+    
+    // Dados de dispositivo
+    const deviceData = {
+      device_type: typeof window !== 'undefined' && window.innerWidth < 768 ? 'mobile' : 
+                   typeof window !== 'undefined' && window.innerWidth < 1024 ? 'tablet' : 'desktop',
+      screen_width: typeof window !== 'undefined' ? window.screen.width : 1920,
+      screen_height: typeof window !== 'undefined' ? window.screen.height : 1080,
+      viewport_width: typeof window !== 'undefined' ? window.innerWidth : 1920,
+      viewport_height: typeof window !== 'undefined' ? window.innerHeight : 1080,
+      pixel_ratio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+      browser: getBrowserName(),
+      operating_system: getOperatingSystem(),
+      language: typeof navigator !== 'undefined' ? navigator.language : 'pt-BR',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      connection_type: typeof navigator !== 'undefined' && (navigator as any).connection ? 
+                      (navigator as any).connection.effectiveType : 'unknown'
+    };
+    
+    // Dados de performance
+    const performanceData = {
+      page_load_time: typeof performance !== 'undefined' ? Math.round(performance.now()) : 0,
+      dom_content_loaded: typeof performance !== 'undefined' && performance.timing ? 
+                         performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart : 0,
+      first_contentful_paint: typeof performance !== 'undefined' && (performance as any).getEntriesByType ?
+                            (performance as any).getEntriesByType('paint')[0]?.startTime || 0 : 0
+    };
+    
+    // Combinar todos os enriquecimentos
+    return {
+      // 🎯 Dados do Facebook Ads (se disponíveis)
+      campaign_name: metaEventData.campaign_name || 'unknown',
+      campaign_id: metaEventData.campaign_id || 'unknown',
+      adset_name: metaEventData.adset_name || 'unknown',
+      adset_id: metaEventData.adset_id || 'unknown',
+      ad_name: metaEventData.ad_name || 'unknown',
+      ad_id: metaEventData.ad_id || 'unknown',
+      placement: metaEventData.placement || 'unknown',
+      campaign_type: metaEventData.campaign_type || 'unknown',
+      ad_format: metaEventData.ad_format || 'unknown',
+      targeting_type: metaEventData.targeting_type || 'unknown',
+      audience_segment: metaEventData.audience_segment || 'general',
+      creative_type: metaEventData.creative_type || 'standard',
+      objective_type: metaEventData.objective_type || 'awareness',
+      
+      // 🎯 Dados de dispositivo
+      ...deviceData,
+      
+      // 🎯 Dados de performance
+      ...performanceData,
+      
+      // 🎯 Metadados de sessão
+      session_start_time: Date.now(),
+      page_number: 1,
+      user_journey_stage: 'awareness',
+      content_language: 'pt-BR',
+      market: 'BR',
+      platform: 'web'
+    };
+    
+  } catch (error) {
+    console.error('Erro no enriquecimento avançado:', error);
+    return {};
+  }
+}
+
+/**
+ * 🌱 Detecta nome do browser
+ */
+function getBrowserName(): string {
+  if (typeof navigator === 'undefined') return 'unknown';
+  
+  const userAgent = navigator.userAgent;
+  if (userAgent.includes('Chrome')) return 'chrome';
+  if (userAgent.includes('Firefox')) return 'firefox';
+  if (userAgent.includes('Safari')) return 'safari';
+  if (userAgent.includes('Edge')) return 'edge';
+  if (userAgent.includes('Opera')) return 'opera';
+  
+  return 'unknown';
+}
+
+/**
+ * 🖥️ Detecta sistema operacional
+ */
+function getOperatingSystem(): string {
+  if (typeof navigator === 'undefined') return 'unknown';
+  
+  const userAgent = navigator.userAgent;
+  if (userAgent.includes('Windows')) return 'windows';
+  if (userAgent.includes('Mac')) return 'macos';
+  if (userAgent.includes('Linux')) return 'linux';
+  if (userAgent.includes('Android')) return 'android';
+  if (userAgent.includes('iOS')) return 'ios';
+  
+  return 'unknown';
+}
+/**
  * 🚀 Função principal de disparo de eventos (Unificada)
  */
 export async function fireMetaEventDefinitivo(
@@ -173,7 +281,10 @@ export async function fireMetaEventDefinitivo(
     // 1. Obter dados completos do usuário
     const userData = await getCompleteUserData();
     
-    // 2. Gerar chaves de deduplicação
+    // 2. Obter enriquecimento avançado
+    const advancedEnrichment = await getAdvancedEnrichment();
+    
+    // 3. Gerar chaves de deduplicação
     let eventId: string;
     let fbqOptions: any = {};
     let deduplicationKeys: any = {};
@@ -193,10 +304,13 @@ export async function fireMetaEventDefinitivo(
       deduplicationKeys = { event_id: eventId };
     }
     
-    // 3. Parâmetros completos (Mantidos exatamente como estavam)
+    // 4. Parâmetros completos com enriquecimento avançado
     const params = {
       // Dados do usuário (100% cobertura - Nota 9.3)
       ...(Object.keys(userData).length > 0 && { user_data: userData }),
+      
+      // 🎯 ENRIQUECIMENTO AVANÇADO (Facebook Ads + Dispositivo + Performance)
+      ...advancedEnrichment,
       
       // Chaves de deduplicação
       ...deduplicationKeys,
@@ -239,6 +353,10 @@ export async function fireMetaEventDefinitivo(
       console.log('  📊 Dados pessoais:', !!(userData.em && userData.ph && userData.fn && userData.ln));
       console.log('  🌍 Dados geográficos:', !!(userData.ct && userData.st && userData.zip && userData.country));
       console.log('  🔑 Deduplicação:', '✅ Completa');
+      console.log('  🎯 Enriquecimento Avançado:', '✅ Facebook Ads + Dispositivo + Performance');
+      console.log('  📱 Campaign Data:', !!(advancedEnrichment.campaign_name && advancedEnrichment.ad_name));
+      console.log('  🖥️ Device Data:', !!(advancedEnrichment.device_type && advancedEnrichment.browser));
+      console.log('  ⚡ Performance Data:', !!(advancedEnrichment.page_load_time && advancedEnrichment.connection_type));
       console.log('  🎛️ Modo:', BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY');
       console.log('  📈 Nota Esperada:', '9.3/10 ✅');
     }
@@ -268,11 +386,11 @@ export async function fireMetaEventDefinitivo(
 // ===== EVENTOS ESPECÍFICOS (Mantidos exatamente como estavam) =====
 
 /**
- * 📄 PageView - Nota 9.3/10 (Padronizado com eventos de alta qualidade)
+ * 📄 PageView - Nota 9.3/10 (Padronizado COMPLETO como eventos de alta qualidade)
  */
 export async function firePageViewDefinitivo(customParams: any = {}) {
   return fireMetaEventDefinitivo('PageView', {
-    // Dados comerciais completos (como ViewContent)
+    // 🎯 DADOS COMERCIAIS COMPLETOS (idêntico ViewContent)
     value: 39.9,
     currency: 'BRL',
     content_ids: ['339591'],
@@ -283,7 +401,7 @@ export async function firePageViewDefinitivo(customParams: any = {}) {
     availability: 'in stock',
     predicted_ltv: 39.9 * 3.5,
     
-    // Metadados de engajamento (como Lead)
+    // 🎯 DADOS DE ENGAJAMENTO COMPLETOS (idêntico Lead)
     trigger_type: 'page_load',
     time_on_page: 0,
     scroll_depth: 0,
@@ -291,10 +409,27 @@ export async function firePageViewDefinitivo(customParams: any = {}) {
     user_engagement: 100,
     session_id: `sess_${Date.now()}`,
     
-    // Dados de navegação
+    // 🎯 DADOS DE NAVEGAÇÃO AVANÇADOS
     page_title: typeof document !== 'undefined' ? document.title : '',
     page_location: typeof window !== 'undefined' ? window.location.href : '',
     referrer: typeof document !== 'undefined' ? document.referrer : 'direct',
+    
+    // 🎯 DADOS DE PERFORMANCE
+    page_load_time: typeof performance !== 'undefined' ? Math.round(performance.now()) : 0,
+    connection_type: typeof navigator !== 'undefined' && (navigator as any).connection ? (navigator as any).connection.effectiveType : 'unknown',
+    device_memory: typeof navigator !== 'undefined' && (navigator as any).deviceMemory ? (navigator as any).deviceMemory : 'unknown',
+    
+    // 🎯 DADOS DE CONTEXTO
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    language: typeof navigator !== 'undefined' ? navigator.language : 'pt-BR',
+    platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown',
+    
+    // 🎯 DADOS DE CAMPANHA (UTMs)
+    utm_source: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('utm_source') || 'direct',
+    utm_medium: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('utm_medium') || 'none',
+    utm_campaign: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('utm_campaign') || 'none',
+    utm_content: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('utm_content') || 'none',
+    utm_term: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('utm_term') || 'none',
     
     ...customParams
   }, 'standard');
@@ -421,6 +556,10 @@ export async function fireAllEventsDefinitivo() {
   console.log('  ✅ Deduplicação unificada e consistente');
   console.log('  ✅ PageView com dados comerciais completos');
   console.log('  ✅ Lead/Checkout com dados enriquecidos');
+  console.log('  ✅ Enriquecimento Avançado em TODOS eventos');
+  console.log('  ✅ Facebook Ads parsing automático');
+  console.log('  ✅ Device detection completo');
+  console.log('  ✅ Performance metrics incluídas');
   console.log('  ✅ Nota 9.3/10 mantida em todos eventos');
   
   try {
@@ -433,12 +572,18 @@ export async function fireAllEventsDefinitivo() {
     
     console.log('\n🎉 TODOS OS EVENTOS DISPARADOS COM SUCESSO!');
     console.log('📈 NOTAS ESPERADAS (MANTIDAS):');
-    console.log('  📄 PageView: 9.3/10 ✅');
-    console.log('  👁️ ViewContent: 9.3/10 ✅');
-    console.log('  📜 ScrollDepth: 9.3/10 ✅');
-    console.log('  🖱️ CTAClick: 9.3/10 ✅');
-    console.log('  🎯 Lead: 9.3/10 ✅');
-    console.log('  🛒 InitiateCheckout: 9.3/10 ✅');
+    console.log('  📄 PageView: 9.3/10 ✅ (COM ENRIQUECIMENTO AVANÇADO)');
+    console.log('  👁️ ViewContent: 9.3/10 ✅ (COM ENRIQUECIMENTO AVANÇADO)');
+    console.log('  📜 ScrollDepth: 9.3/10 ✅ (COM ENRIQUECIMENTO AVANÇADO)');
+    console.log('  🖱️ CTAClick: 9.3/10 ✅ (COM ENRIQUECIMENTO AVANÇADO)');
+    console.log('  🎯 Lead: 9.3/10 ✅ (COM ENRIQUECIMENTO AVANÇADO)');
+    console.log('  🛒 InitiateCheckout: 9.3/10 ✅ (COM ENRIQUECIMENTO AVANÇADO)');
+    console.log('\n🎯 ENRIQUECIMENTO AVANÇADO INCLUÍDO EM TODOS:');
+    console.log('  📱 Facebook Ads Data (campaign, adset, ad)');
+    console.log('  🖥️ Device Data (type, browser, OS)');
+    console.log('  ⚡ Performance Data (load time, connection)');
+    console.log('  🌍 Location Data (IP, geolocation)');
+    console.log('  🎯 Behavioral Data (engagement, journey)');
     
   } catch (error) {
     console.error('❌ Erro ao disparar eventos:', error);
