@@ -266,10 +266,10 @@ async function createAdvancedPurchaseEvent(caktoData: any, enrichedCustomer: any
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST10150', // CÓDIGO TESTE META - PARA VALIDAÇÃO PÓS-DEPLOY
+    test_event_code: undefined, // MODO PRODUÇÃO - EVENTOS REAIS PARA CAMPANHAS
     
     // Metadata avançado para qualidade máxima
-    debug_mode: true, // MODO TESTE TEMPORÁRIO PARA VALIDAÇÃO PÓS-DEPLOY
+    debug_mode: false, // MODO PRODUÇÃO - DEBUG DESATIVADO
     partner_agent: 'cakto_webhook_v3_enterprise',
     namespace: 'maracujazeropragas',
     upload_tag: 'cakto_purchase',
@@ -329,7 +329,7 @@ async function createLeadEvent(caktoData: any) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST10150', // CÓDIGO TESTE META - PARA VALIDAÇÃO PÓS-DEPLOY
+    test_event_code: undefined, // MODO PRODUÇÃO - EVENTOS REAIS PARA CAMPANHAS
   };
 
   console.log('📤 LEAD EVENT (ABANDONMENT):', JSON.stringify(leadEvent, null, 2));
