@@ -67,11 +67,56 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
   const timestamp = Math.floor(Date.now() / 1000);
   const eventId = `Purchase_${timestamp}_${Math.random().toString(36).substr(2, 5)}`;
 
-  // Extrair dados com múltiplos nomes possíveis
-  const email = allpesData.customer_email || allpesData.email || allpesData.buyer_email || '';
-  const phone = allpesData.customer_phone || allpesData.phone || allpesData.buyer_phone || '';
-  const amount = allpesData.amount || allpesData.value || allpesData.total || allpesData.price || 0;
-  const transactionId = allpesData.transaction_id || allpesData.order_id || allpesData.id || '';
+  // Extrair dados com múltiplos nomes possíveis (busca extensiva)
+  const emailFields = ['customer_email', 'email', 'buyer_email', 'client_email', 'user_email', 'purchaser_email'];
+  const amountFields = ['amount', 'value', 'total', 'price', 'payment_amount', 'order_value', 'purchase_amount'];
+  const phoneFields = ['customer_phone', 'phone', 'buyer_phone', 'client_phone', 'user_phone'];
+  const transactionFields = ['transaction_id', 'order_id', 'id', 'payment_id', 'purchase_id'];
+  
+  let email = '';
+  for (const field of emailFields) {
+    if (allpesData[field] && allpesData[field].trim() !== '') {
+      email = allpesData[field];
+      break;
+    }
+  }
+  
+  let amount = 0;
+  for (const field of amountFields) {
+    if (allpesData[field] && allpesData[field] !== '0' && allpesData[field] !== 0) {
+      amount = Number(allpesData[field]);
+      break;
+    }
+  }
+  
+  let phone = '';
+  for (const field of phoneFields) {
+    if (allpesData[field] && allpesData[field].trim() !== '') {
+      phone = allpesData[field];
+      break;
+    }
+  }
+  
+  let transactionId = '';
+  for (const field of transactionFields) {
+    if (allpesData[field] && allpesData[field].trim() !== '') {
+      transactionId = allpesData[field];
+      break;
+    }
+  }
+
+  // Log EXTREMO dos dados extraídos
+  console.log('🔍 === EXTRAÇÃO EXTENSIVA DE DADOS ===');
+  console.log('📧 Email extraído:', email ? '***' + email.split('@')[1] : 'NOT_FOUND');
+  console.log('💰 Amount extraído:', amount);
+  console.log('📞 Phone extraído:', phone ? '***' + phone.slice(-4) : 'NOT_FOUND');
+  console.log('🆔 Transaction ID extraído:', transactionId);
+  console.log('🔍 Campos verificados:', {
+    email: emailFields,
+    amount: amountFields,
+    phone: phoneFields,
+    transaction: transactionFields
+  });
 
   // Sistema avançado de enriquecimento de dados
   const enrichedData = {
@@ -273,22 +318,53 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Validar estrutura essencial dos dados (aceitar múltiplos nomes)
-    const email = allpesData.customer_email || allpesData.email || allpesData.buyer_email || '';
-    const amount = allpesData.amount || allpesData.value || allpesData.total || allpesData.price || '0';
+    // Log EXTREMO para debug
+    console.log('🔍 === ANÁLISE COMPLETA DE CAMPOS ===');
+    console.log('📋 TODOS OS CAMPOS RECEBIDOS:', Object.keys(allpesData));
+    console.log('📋 TODOS OS VALORES:', JSON.stringify(allpesData, null, 2));
     
-    console.log('🔍 CAMPOS EXTRAÍDOS:', { email: email ? '***' + email.split('@')[1] : 'missing', amount });
+    // Busca EXTENSIVA por email
+    const emailFields = ['customer_email', 'email', 'buyer_email', 'client_email', 'user_email', 'purchaser_email'];
+    let email = '';
+    for (const field of emailFields) {
+      if (allpesData[field] && allpesData[field].trim() !== '') {
+        email = allpesData[field];
+        console.log(`✅ Email encontrado no campo '${field}':`, email);
+        break;
+      }
+    }
+    
+    // Busca EXTENSIVA por amount
+    const amountFields = ['amount', 'value', 'total', 'price', 'payment_amount', 'order_value', 'purchase_amount'];
+    let amount = '0';
+    for (const field of amountFields) {
+      if (allpesData[field] && allpesData[field] !== '0' && allpesData[field] !== 0) {
+        amount = String(allpesData[field]);
+        console.log(`✅ Amount encontrado no campo '${field}':`, amount);
+        break;
+      }
+    }
+    
+    console.log('🔍 RESULTADO DA EXTRAÇÃO:', { 
+      email: email ? '***' + email.split('@')[1] : 'NOT_FOUND', 
+      amount,
+      email_fields_checked: emailFields,
+      amount_fields_checked: amountFields
+    });
     
     const requiredFields = ['status'];
     const missingFields = requiredFields.filter(field => !allpesData[field]);
     
     // Validação personalizada para email e amount
-    if (!email) {
-      console.log('❌ Email não encontrado em nenhum campo');
+    if (!email || email.trim() === '') {
+      console.log('❌ Email não encontrado em NENHUM campo verificado');
+      console.log('❌ Campos de email verificados:', emailFields.map(f => `${f}: ${allpesData[f]}`));
       missingFields.push('email');
     }
     
-    if (!amount || amount === '0') {
-      console.log('❌ Amount não encontrado ou é zero');
+    if (!amount || amount === '0' || amount === 0) {
+      console.log('❌ Amount não encontrado ou é zero em NENHUM campo verificado');
+      console.log('❌ Campos de amount verificados:', amountFields.map(f => `${f}: ${allpesData[f]}`));
       missingFields.push('amount');
     }
     
