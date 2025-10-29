@@ -496,22 +496,41 @@ async function sendToMetaWithRetry(eventData: any, eventType: string): Promise<a
 }
 
 // Função principal do webhook Cakto ENTERPRISE
-// Função para enviar estatísticas para o dashboard
-async function updateStats(eventData: any) {
+// Função para enviar estatísticas para o dashboard (SINCRONA para evitar erros no serverless)
+function updateStats(eventData: any) {
   try {
-    await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/webhook-cakto/stats`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'event_processed',
-        eventType: eventData.eventType,
-        transactionId: eventData.transactionId,
-        success: eventData.success,
-        processingTime: eventData.processingTime,
-        dataSource: eventData.dataSource,
-        duplicate: eventData.duplicate || false
-      })
+    // Atualizar estatísticas locais diretamente (sem fetch para evitar erros no serverless)
+    stats.totalProcessed++;
+    
+    if (eventData.success) {
+      stats.successCount++;
+      if (eventData.eventType === 'purchase_approved') {
+        stats.purchaseApproved++;
+      } else if (eventData.eventType === 'checkout_abandonment') {
+        stats.checkoutAbandonment++;
+      }
+    } else {
+      stats.errorCount++;
+    }
+    
+    if (eventData.duplicate) {
+      stats.duplicatePrevented++;
+    }
+    
+    // Atualizar tempo médio de processamento
+    if (eventData.processingTime) {
+      stats.averageProcessingTime = Math.round(
+        (stats.averageProcessingTime * (stats.totalProcessed - 1) + eventData.processingTime) / stats.totalProcessed
+      );
+    }
+    
+    console.log('📊 Estatísticas atualizadas localmente:', {
+      total: stats.totalProcessed,
+      success: stats.successCount,
+      purchases: stats.purchaseApproved,
+      avgTime: stats.averageProcessingTime
     });
+    
   } catch (error) {
     console.error('❌ Erro ao atualizar estatísticas:', error);
     // Não falhar o webhook se estatísticas falharem
@@ -637,7 +656,7 @@ export async function POST(request: NextRequest) {
 
     // 8. Atualizar dashboard de estatísticas
     // Nota: userDataFromDB não está disponível aqui, então usamos uma fonte genérica
-    await updateStats({
+    updateStats({
       eventType: eventType,
       transactionId: data.id || 'unknown',
       success: true,
