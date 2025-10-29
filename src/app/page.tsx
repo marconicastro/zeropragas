@@ -236,6 +236,8 @@ export default function App() {
     secureParams['success_url'] = `${window.location.origin}/obrigado`;
     secureParams['cancel_url'] = `${window.location.origin}/checkout`;
     
+  
+    
     // ✅ DADOS COMPLETOS E SEGUROS no backup (localStorage + server-side)
     const secureDataBackup = {
       // Dados PESSOAIS (protegidos - NÃO vão na URL)
