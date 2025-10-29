@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAUsqHMv8GcBP66lcn7Huc8kF1IZAVedOxRMFnPSLn53rZCO3FSWMkrQpOVgP9YKZCdCgXiZBuLIFfnxx8dTjO8VBo4wCafeVfaOCOaU0ZBsNU6B9FdwAcI7zPCLZBzdn44ZA5zR5HWfO4ZBnpCEFKKA8B0kgmdmKShqhBEW8k7UmiR7rNdPxAZAVZB2124gH0OwZDZD';
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAUsqHMv8GcBP5dQ8HjQcx4ZCEtCq958ZBKe71qP5ZAUZAtZAGfAN4OzsKZCAsCE3ZATp8cuTn5bWgWI2m35H31nnPKg8CMX3cqWa709DWSPdBXD2vF6P8RMXMZAnRNZCXcwX0nL0sBYbN821XurMRwrHZAM1X5qX7AjljZBabX8XArHoy4MZBZCl06lKHYHyuzBs2AZDZD';
 
 // Função para fazer hash SHA-256
 function sha256(data: string): string {
@@ -214,37 +214,79 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
     test_event_code: process.env.NODE_ENV === 'development' ? 'TEST' : undefined
   };
 
-  console.log('🎯 Purchase Event Avançado sendo enviado:', {
-    event_id: eventId,
-    pixel_id: META_PIXEL_ID,
-    value: enrichedData.primary_amount,
-    currency: 'BRL',
-    email: enrichedData.primary_email,
-    enrichment_level: enrichedData.enrichment_level,
-    data_source: enrichedData.data_source
-  });
+  // Log completo do payload sendo enviado
+  console.log('📤 PAYLOAD COMPLETO ENVIADO PARA META:', JSON.stringify(purchaseEvent, null, 2));
+  console.log('🌐 URL DA META API:', `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`);
+  console.log('🔑 TOKEN USADO:', META_ACCESS_TOKEN.substring(0, 20) + '...');
 
   try {
-    const response = await fetch(`https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`, {
+    const metaUrl = `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`;
+    const options = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(purchaseEvent)
-    });
+    };
 
-    const responseData = await response.json();
+    console.log('⏳ INICIANDO CHAMADA PARA META API...');
+    const metaResponse = await fetch(metaUrl, options);
+    const metaResult = await metaResponse.json();
     
-    console.log('✅ Resposta da Meta (Purchase Avançado):', responseData);
+    // Log completo da resposta
+    console.log('📥 RESPOSTA META STATUS HTTP:', metaResponse.status);
+    console.log('📥 RESPOSTA META STATUS TEXT:', metaResponse.statusText);
+    console.log('📥 RESPOSTA META HEADERS:', {
+      'content-type': metaResponse.headers.get('content-type'),
+      'x-fb-trace-id': metaResponse.headers.get('x-fb-trace-id'),
+      'x-fb-debug': metaResponse.headers.get('x-fb-debug')
+    });
+    console.log('📥 RESPOSTA META BODY COMPLETO:', JSON.stringify(metaResult, null, 2));
     
-    if (!response.ok) {
-      throw new Error(`Erro na Meta API: ${responseData.error?.message || 'Erro desconhecido'}`);
+    // Verificação detalhada de erros
+    if (metaResult.error) {
+      console.error('❌ ERRO DETALHADO DA META API:');
+      console.error('   - Error Type:', metaResult.error.type);
+      console.error('   - Error Code:', metaResult.error.code);
+      console.error('   - Error Message:', metaResult.error.message);
+      console.error('   - Error Subcode:', metaResult.error.error_subcode);
+      console.error('   - Error User Title:', metaResult.error.error_user_title);
+      console.error('   - Error User Message:', metaResult.error.error_user_msg);
+      console.error('   - FBTrace ID:', metaResult.error.fbtrace_id);
+      console.error('❌ ERRO COMPLETO JSON:', JSON.stringify(metaResult.error, null, 2));
+    }
+    
+    // Log de sucesso detalhado
+    if (metaResult.data && metaResult.data.length > 0) {
+      console.log('✅ EVENTO ENVIADO COM SUCESSO:');
+      metaResult.data.forEach((event, index) => {
+        console.log(`   Event ${index + 1}:`);
+        console.log(`   - Event ID: ${event.event_id}`);
+        console.log(`   - Event Processing Time: ${event.event_processing_time_ms}`);
+        console.log(`   - Standard Event ID: ${event.standard_event_id}`);
+      });
+    }
+    
+    if (metaResult.debug_trace_id) {
+      console.log('🐛 DEBUG TRACE ID:', metaResult.debug_trace_id);
+    }
+    
+    if (metaResult.fbtrace_id) {
+      console.log('🔍 FBTRACE ID:', metaResult.fbtrace_id);
+    }
+    
+    console.log('✅ Resposta da Meta (Purchase Avançado):', metaResult);
+    
+    if (!metaResponse.ok) {
+      const errorMessage = `Erro na Meta API: ${metaResult.error?.message || 'Erro desconhecido'} (Status: ${metaResponse.status})`;
+      console.error('❌', errorMessage);
+      throw new Error(errorMessage);
     }
 
     return {
       success: true,
       event_id: eventId,
-      meta_response: responseData,
+      meta_response: metaResult,
       enrichment_data: enrichedData
     };
   } catch (error) {
@@ -319,12 +361,15 @@ export async function POST(request: NextRequest) {
     });
 
     // 6. Enviar Purchase Event para Meta (nível enterprise)
+    console.log('🚀 INICIANDO ENVIO PARA META...');
     const metaResult = await sendPurchaseToMeta(allpesData, userData);
-    console.log('🚀 Purchase Event Enterprise enviado com sucesso:', {
-      event_id: metaResult.event_id,
-      processing_time: Date.now() - startTime,
-      enrichment_level: userData.enrichment_level
-    });
+    
+    console.log('🎉 Purchase Event Enterprise ENVIADO COM SUCESSO:');
+    console.log('   - Event ID:', metaResult.event_id);
+    console.log('   - Processing Time:', Date.now() - startTime, 'ms');
+    console.log('   - Enrichment Level:', userData.enrichment_level);
+    console.log('   - Meta Response:', JSON.stringify(metaResult.meta_response, null, 2));
+    console.log('   - Enrichment Data:', JSON.stringify(metaResult.enrichment_data, null, 2));
 
     // 7. Retornar sucesso completo
     return NextResponse.json({
