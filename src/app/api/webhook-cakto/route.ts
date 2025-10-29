@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
-import { getStandardizedUserDataServer } from '@/lib/serverUserData';
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
@@ -12,7 +11,7 @@ const CAKTO_SECRET = process.env.CAKTO_SECRET || '12f4848f-35e9-41a8-8da4-103264
 const CAKTO_PRODUCT_ID = 'hacr962'; // Content ID do produto na Cakto
 
 // Configurações Enterprise
-const WEBHOOK_VERSION = '3.0-ENTERPRISE';
+const WEBHOOK_VERSION = '3.1-enterprise-unified-server';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 const TIMEOUT_MS = 15000;
@@ -72,149 +71,8 @@ function cleanPhone(phone?: string): string | null {
   return phone.replace(/\D/g, '').replace(/^55/, '').slice(-11);
 }
 
-// Função para buscar lead unificado no banco
-async function findUnifiedLead(email?: string, phone?: string): Promise<any> {
-  if (!email && !phone) return null;
-  
-  try {
-    // Verificar se o banco está disponível
-    if (!db || typeof db.leadUserData !== 'function') {
-      console.log('⚠️ Banco de dados não disponível, usando fallback para Cakto...');
-      return null;
-    }
-    
-    let lead = null;
-    
-    // Tentar buscar por email primeiro
-    if (email) {
-      lead = await db.leadUserData.findUnique({
-        where: { email: email.toLowerCase().trim() }
-      });
-    }
-    
-    // Se não encontrar por email, tentar por telefone
-    if (!lead && phone) {
-      const phoneClean = cleanPhone(phone);
-      lead = await db.leadUserData.findFirst({
-        where: { phone: phoneClean }
-      });
-    }
-    
-    return lead;
-  } catch (error) {
-    console.error('❌ Erro ao buscar lead unificado:', error);
-    console.log('⚠️ Usando fallback para dados da Cakto...');
-    return null;
-  }
-}
-
-// Função para obter user_data validado (prioridade: lead unificado > dados Cakto)
-async function getValidatedUserData(caktoCustomer: any) {
-  const caktoEmail = caktoCustomer?.email;
-  const caktoPhone = caktoCustomer?.phone;
-  const caktoName = caktoCustomer?.name;
-  
-  console.log('🔍 Buscando lead unificado para validação cruzada...');
-  
-  // Buscar lead no banco
-  const unifiedLead = await findUnifiedLead(caktoEmail, caktoPhone);
-  
-  if (unifiedLead) {
-    console.log('✅ Lead unificado encontrado! Usando dados validados.');
-    console.log('📊 Fonte:', unifiedLead.captureSource);
-    console.log('📅 Captura:', unifiedLead.createdAt);
-    
-    // Usar dados do lead unificado (prioridade máxima)
-    return {
-      email: unifiedLead.email,
-      phone: unifiedLead.phone,
-      firstName: unifiedLead.firstName,
-      lastName: unifiedLead.lastName,
-      fullName: unifiedLead.fullName,
-      city: unifiedLead.city,
-      state: unifiedLead.state,
-      zipcode: unifiedLead.zipcode,
-      country: unifiedLead.country,
-      dataSource: 'unified_lead',
-      leadId: unifiedLead.id,
-      captureSource: unifiedLead.captureSource
-    };
-  }
-  
-  console.log('⚠️ Lead unificado não encontrado. Usando dados da Cakto.');
-  
-  // Fallback para dados da Cakto
-  const nameParts = caktoName?.split(' ') || [];
-  return {
-    email: caktoEmail,
-    phone: cleanPhone(caktoPhone),
-    firstName: nameParts[0] || '',
-    lastName: nameParts.slice(1).join(' ') || '',
-    fullName: caktoName || '',
-    city: 'br', // Default se não tiver lead unificado
-    state: 'sp', // Default se não tiver lead unificado
-    zipcode: '01310', // Default se não tiver lead unificado
-    country: 'br', // Default se não tiver lead unificado
-    dataSource: 'cakto_fallback',
-    leadId: null
-  };
-}
-
-// Função para registrar evento Cakto no banco
-async function registerCaktoEvent(eventData: any, validatedData: any, metaResponse: any, processingTime: number) {
-  try {
-    // Verificar se o banco está disponível
-    if (!db || typeof db.caktoEvent !== 'function') {
-      console.log('⚠️ Banco de dados não disponível, pulando registro...');
-      return null;
-    }
-    
-    const eventRecord = await db.caktoEvent.create({
-      data: {
-        eventId: eventData.eventId,
-        eventType: eventData.eventType,
-        transactionId: eventData.transactionId,
-        amount: eventData.amount,
-        productId: eventData.productId,
-        productName: eventData.productName,
-        paymentMethod: eventData.paymentMethod,
-        status: eventData.status,
-        
-        // Dados recebidos da Cakto
-        caktoEmail: eventData.caktoEmail,
-        caktoPhone: eventData.caktoPhone,
-        caktoName: eventData.caktoName,
-        
-        // Dados usados na Meta (após validação)
-        usedEmail: validatedData.email,
-        usedPhone: validatedData.phone,
-        usedName: validatedData.fullName,
-        usedCity: validatedData.city,
-        usedState: validatedData.state,
-        usedZipcode: validatedData.zipcode,
-        usedCountry: validatedData.country,
-        
-        // Controle
-        leadDataId: validatedData.leadId,
-        processingTime: processingTime,
-        metaSuccess: metaResponse.success,
-        metaResponse: JSON.stringify(metaResponse)
-      }
-    });
-    
-    console.log('💾 Evento registrado no banco:', eventRecord.id);
-    return eventRecord;
-    
-  } catch (error) {
-    console.error('❌ Erro ao registrar evento no banco:', error);
-    // Não falhar o webhook se o banco der erro
-    console.log('⚠️ Continuando processamento mesmo sem registro no banco...');
-    return null;
-  }
-}
-
-// Função para criar Purchase Event AVANÇADO para Meta com USER_DATA UNIFICADO
-async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: any, requestId: string) {
+// Função para criar Purchase Event para Meta com SUA ESTRUTURA COMPLETA
+async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
   const eventId = `Purchase_${timestamp}_${Math.random().toString(36).substr(2, 8)}`;
   
@@ -233,37 +91,128 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
   const customerState = caktoData.customer?.address?.state || '';
   const customerZipcode = caktoData.customer?.address?.zipcode || '';
   
-  // 🚀 USAR USER_DATA UNIFICADO SERVER-SIDE (mesma estrutura dos eventos lead e initiate checkout)
-  console.log('🔄 Obtendo user_data unificado server-side (mesmo padrão lead/checkout)...');
-  const unifiedUserData = await getStandardizedUserDataServer(
-    customerEmail,
-    customerPhone,
-    customerName,
-    customerCity,
-    customerState,
-    customerZipcode,
-    transactionId
-  );
-  console.log('✅ User_data unificado obtido:', unifiedUserData);
+  // 🚀 USAR SUA ESTRUTURA user_data COMPLETA (IGUAL LEAD E CHECKOUT)
+  console.log('🔄 Obtendo user_data COMPLETO igual aos outros eventos...');
+  
+  // Buscar dados do usuário no banco de dados (mesma lógica do seu sistema)
+  let userDataFromDB = null;
+  if (customerEmail || customerPhone) {
+    try {
+      if (customerEmail) {
+        userDataFromDB = await db.leadUserData.findUnique({
+          where: { email: customerEmail.toLowerCase().trim() }
+        });
+      }
+      
+      if (!userDataFromDB && customerPhone) {
+        const phoneClean = customerPhone.replace(/\D/g, '').replace(/^55/, '').slice(-11);
+        userDataFromDB = await db.leadUserData.findFirst({
+          where: { phone: phoneClean }
+        });
+      }
+      
+      if (userDataFromDB) {
+        console.log('✅ Dados encontrados no banco - usando sua estrutura COMPLETA');
+      }
+    } catch (error) {
+      console.log('⚠️ Banco não disponível, usando API de geolocalização');
+    }
+  }
+  
+  // Se não encontrou no banco, usar API de geolocalização (mesmo sistema do seu site)
+  if (!userDataFromDB) {
+    try {
+      const locationResponse = await fetch('http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query');
+      if (locationResponse.ok) {
+        const locationData = await locationResponse.json();
+        if (locationData.status === 'success') {
+          userDataFromDB = {
+            email: customerEmail || '',
+            phone: customerPhone || '',
+            fullName: customerName || '',
+            city: locationData.city || 'sao paulo',
+            state: locationData.regionName?.toLowerCase() || 'sao paulo',
+            zipcode: locationData.zip || '01310',
+            country: 'br'
+          };
+          console.log('✅ Geolocalização obtida via API:', locationData.city);
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ API de geolocalização falhou, usando defaults');
+      userDataFromDB = {
+        email: customerEmail || '',
+        phone: customerPhone || '',
+        fullName: customerName || '',
+        city: 'sao paulo',
+        state: 'sao paulo', 
+        zipcode: '01310',
+        country: 'br'
+      };
+    }
+  }
+  
+  // Formatar EXATAMENTE como sua estrutura formatUserDataForMeta
+  const phoneClean = userDataFromDB.phone?.replace(/\D/g, '') || '';
+  let phoneWithCountry = phoneClean;
+  
+  if (phoneClean.length === 10) {
+    phoneWithCountry = `55${phoneClean}`;
+  } else if (phoneClean.length === 11) {
+    phoneWithCountry = `55${phoneClean}`;
+  }
+  
+  const nameParts = userDataFromDB.fullName?.toLowerCase().trim().split(' ') || [];
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+  
+  const zipCode = userDataFromDB.zipcode?.replace(/\D/g, '') || '';
+  
+  // Criar user_data EXATAMENTE como sua estrutura
+  const unifiedUserData = {
+    em: userDataFromDB.email ? sha256(userDataFromDB.email.toLowerCase().trim()) : null,
+    ph: phoneWithCountry ? sha256(phoneWithCountry) : null,
+    fn: firstName ? sha256(firstName) : null,
+    ln: lastName ? sha256(lastName) : null,
+    ct: userDataFromDB.city ? sha256(userDataFromDB.city.toLowerCase().trim()) : null,
+    st: userDataFromDB.state ? sha256(userDataFromDB.state.toLowerCase().trim()) : null,
+    zp: zipCode ? sha256(zipCode) : null,
+    country: sha256('br'),
+    external_id: transactionId || `cakto_${Date.now()}`,
+    client_ip_address: null, // CORRETO: null no backend
+    client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server'
+  };
+  
+  console.log('✅ User_data COMPLETO gerado (sua estrutura):', {
+    has_email: !!unifiedUserData.em,
+    has_phone: !!unifiedUserData.ph,
+    has_name: !!unifiedUserData.fn,
+    has_location: !!unifiedUserData.ct,
+    city_original: userDataFromDB.city,
+    state_original: userDataFromDB.state,
+    source: userDataFromDB.email ? 'database_lead' : 'api_geolocation'
+  });
 
-  console.log('🎯 DADOS UNIFICADOS - PURCHASE:', {
+  console.log('🎯 DADOS COMPLETOS - PURCHASE:', {
     transaction_id: transactionId,
     amount,
     product_name: productName,
     payment_method: paymentMethod,
-    data_source: validatedUserData.dataSource,
-    user_data_source: 'unified_server_side',
+    data_source: userDataFromDB.email ? 'database_lead' : 'api_geolocation',
+    user_data_system: 'complete_structure_like_other_events',
     customer_email: customerEmail ? '***' + customerEmail.split('@')[1] : 'missing',
     customer_phone: customerPhone ? '***' + customerPhone.slice(-4) : 'missing',
     customer_name: customerName ? customerName.split(' ')[0] : 'missing',
     has_email: !!unifiedUserData.em,
     has_phone: !!unifiedUserData.ph,
     has_name: !!unifiedUserData.fn,
-    has_location: !!unifiedUserData.ct
+    has_location: !!unifiedUserData.ct,
+    city_real: userDataFromDB.city,
+    state_real: userDataFromDB.state
   });
 
-  // Log dos hashes SHA256 do sistema unificado
-  console.log('🔐 HASHES UNIFICADOS SHA256:', {
+  // Log dos hashes SHA256 da sua estrutura
+  console.log('🔐 HASHES SUA ESTRUTURA SHA256:', {
     email_hash: unifiedUserData.em || 'empty',
     phone_hash: unifiedUserData.ph || 'empty',
     first_name_hash: unifiedUserData.fn || 'empty',
@@ -275,7 +224,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
     external_id: unifiedUserData.external_id || 'empty'
   });
 
-  // Purchase Event Enterprise para Meta com USER_DATA UNIFICADO
+  // Purchase Event para Meta com SUA ESTRUTURA COMPLETA + parâmetros Cakto
   const purchaseEvent = {
     data: [{
       event_name: 'Purchase',
@@ -284,7 +233,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
       action_source: 'website',
       event_source_url: 'https://maracujazeropragas.com/',
       
-      // 🚀 USER_DATA UNIFICADO (MESMA ESTRUTURA DOS EVENTOS LEAD E INITIATE CHECKOUT)
+      // 🚀 SUA ESTRUTURA COMPLETA (IGUAL LEAD E CHECKOUT)
       user_data: unifiedUserData,
       
       // Custom Data AVANÇADO - 50+ PARÂMETROS
@@ -354,8 +303,8 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         event_version: '3.1-enterprise-unified-server', // Atualizado versão
         processing_time_ms: Date.now() - timestamp * 1000,
         webhook_id: requestId,
-        data_validation_source: validatedUserData.dataSource,
-        user_data_system: 'unified_server_side', // NOVO
+        data_validation_source: userDataFromDB.email ? 'database_lead' : 'api_geolocation',
+        user_data_system: 'complete_structure_like_other_events', // ATUALIZADO
         
         // Dados de qualidade para Meta (100% DINÂMICO)
         lead_type: 'purchase',
@@ -422,10 +371,10 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST10150', // MODO TESTE TEMPORÁRIO PARA VALIDAÇÃO
+    test_event_code: '', // MODO PRODUÇÃO - SEM TESTE
     
     // Metadata avançado para qualidade máxima
-    debug_mode: true, // MODO TESTE TEMPORÁRIO - DEBUG ATIVADO
+    debug_mode: false, // MODO PRODUÇÃO - DEBUG DESATIVADO
     partner_agent: 'cakto_webhook_v3.1-enterprise-unified-server',
     namespace: 'maracujazeropragas',
     upload_tag: 'cakto_purchase_unified_server',
@@ -485,7 +434,7 @@ async function createLeadEvent(caktoData: any) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST10150', // MODO TESTE TEMPORÁRIO PARA VALIDAÇÃO
+    test_event_code: '', // MODO PRODUÇÃO - SEM TESTE
   };
 
   console.log('📤 LEAD EVENT (ABANDONMENT):', JSON.stringify(leadEvent, null, 2));
@@ -547,6 +496,28 @@ async function sendToMetaWithRetry(eventData: any, eventType: string): Promise<a
 }
 
 // Função principal do webhook Cakto ENTERPRISE
+// Função para enviar estatísticas para o dashboard
+async function updateStats(eventData: any) {
+  try {
+    await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/webhook-cakto/stats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'event_processed',
+        eventType: eventData.eventType,
+        transactionId: eventData.transactionId,
+        success: eventData.success,
+        processingTime: eventData.processingTime,
+        dataSource: eventData.dataSource,
+        duplicate: eventData.duplicate || false
+      })
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar estatísticas:', error);
+    // Não falhar o webhook se estatísticas falharem
+  }
+}
+
 export async function POST(request: NextRequest) {
   console.log('🚀 WEBHOOK CAKTO CHAMADO - INÍCIO');
   
@@ -664,7 +635,16 @@ export async function POST(request: NextRequest) {
     console.log(`🎉 [${requestId}] Evento processado com sucesso!`);
     console.log(`📊 Stats atualizadas:`, JSON.stringify(stats, null, 2));
 
-    // 8. Retornar resposta enterprise
+    // 8. Atualizar dashboard de estatísticas
+    await updateStats({
+      eventType: eventType,
+      transactionId: data.id || 'unknown',
+      success: true,
+      processingTime: processingTime,
+      dataSource: userDataFromDB.email ? 'database_lead' : 'api_geolocation'
+    });
+
+    // 9. Retornar resposta enterprise
     return NextResponse.json({
       status: 'success',
       message: `Evento ${eventType} processado com sucesso`,
@@ -713,51 +693,25 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
     throw new Error('Campos essenciais ausentes: customer.email, amount, status=paid');
   }
 
-  // 🔥 NOVO: Obter dados validados (prioridade: lead unificado > Cakto)
-  const validatedUserData = await getValidatedUserData(data.customer);
-  console.log(`✅ [${requestId}] Dados validados obtidos. Fonte: ${validatedUserData.dataSource}`);
+  console.log(`✅ [${requestId}] Processando purchase_approved...`);
   
-  // Criar e enviar Purchase Event COM DADOS VALIDADOS
-  const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, validatedUserData, requestId);
+  // Criar e enviar Purchase Event COM SUA ESTRUTURA COMPLETA
+  const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, requestId);
   const metaResult = await sendToMetaWithRetry(purchaseEvent, 'Purchase');
   
-  // 🔥 NOVO: Registrar evento no banco (com fallback seguro)
-  const processingTime = Date.now() - startTime;
-  const eventData = {
-    eventId,
-    eventType: 'purchase_approved',
-    transactionId: data.id,
-    amount: data.amount,
-    productId: data.product?.short_id,
-    productName: data.product?.name,
-    paymentMethod: data.paymentMethod,
-    status: data.status,
-    caktoEmail: data.customer?.email,
-    caktoPhone: data.customer?.phone,
-    caktoName: data.customer?.name
-  };
-  
-  // Tentar registrar no banco, mas não falhar se der erro
-  try {
-    await registerCaktoEvent(eventData, validatedUserData, metaResult, processingTime);
-  } catch (dbError) {
-    console.log('⚠️ Registro no banco falhou, mas webhook continuou normalmente');
-  }
-  
-  console.log(`🎉 [${requestId}] PURCHASE VALIDADO ENVIADO! Event ID: ${eventId}`);
+  console.log(`🎉 [${requestId}] PURCHASE COM SUA ESTRUTURA ENVIADO! Event ID: ${eventId}`);
   
   return {
     event_type: 'purchase_approved',
     meta_event_id: eventId,
     meta_response: metaResult,
     validation_data: {
-      data_source: validatedUserData.dataSource,
-      lead_id: validatedUserData.leadId,
-      capture_source: validatedUserData.captureSource,
-      used_email: validatedUserData.email ? '***' + validatedUserData.email.split('@')[1] : 'missing',
-      used_phone: validatedUserData.phone ? '***' + validatedUserData.phone.slice(-4) : 'missing',
-      used_city: validatedUserData.city,
-      used_state: validatedUserData.state
+      data_source: 'database_lead_or_api_geolocation',
+      structure: 'complete_like_other_events',
+      used_email: data.customer?.email ? '***' + data.customer.email.split('@')[1] : 'missing',
+      used_phone: data.customer?.phone ? '***' + data.customer.phone.slice(-4) : 'missing',
+      used_city: 'from_database_or_api',
+      used_state: 'from_database_or_api'
     },
     transaction_data: {
       id: data.id,
