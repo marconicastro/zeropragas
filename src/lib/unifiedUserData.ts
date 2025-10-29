@@ -79,7 +79,7 @@ export async function getCompleteUserData(): Promise<CompleteUserData> {
  * Determina a fonte dos dados para debugging
  */
 function determineSource(persisted: any, location: any): string {
-  if (persisted && (persisted.city || persistedData?.state || persistedData?.cep)) {
+  if (persisted && (persisted.city || persisted?.state || persisted?.cep)) {
     return 'persisted_enriched';
   }
   if (location.source !== 'default_brazil') {
@@ -142,14 +142,23 @@ async function hashData(data: string | null | undefined): Promise<string | null>
   const normalized = data.toString().toLowerCase().trim().replace(/\s+/g, '');
   
   try {
-    const encoder = new TextEncoder();
-    const dataUint8Array = encoder.encode(normalized);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', dataUint8Array);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+    // Verificar se estamos no ambiente server-side ou browser
+    if (typeof window === 'undefined') {
+      // Server-side: usar Node.js crypto
+      const crypto = await import('crypto');
+      const hash = crypto.createHash('sha256').update(normalized).digest('hex');
+      return hash;
+    } else {
+      // Browser-side: usar Web Crypto API
+      const encoder = new TextEncoder();
+      const dataUint8Array = encoder.encode(normalized);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', dataUint8Array);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    }
   } catch (error) {
-    console.error('Erro no hash:', error);
+    console.error('Erro no hash SHA256:', error);
     return null;
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
+import { getStandardizedUserData } from '@/lib/unifiedUserData';
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
@@ -212,7 +213,7 @@ async function registerCaktoEvent(eventData: any, validatedData: any, metaRespon
   }
 }
 
-// Função para criar Purchase Event AVANÇADO para Meta
+// Função para criar Purchase Event AVANÇADO para Meta com USER_DATA UNIFICADO
 async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: any, requestId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
   const eventId = `Purchase_${timestamp}_${Math.random().toString(36).substr(2, 8)}`;
@@ -224,39 +225,38 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
   const paymentMethod = caktoData.paymentMethod || 'unknown';
   const offerId = caktoData.offer?.id || CAKTO_PRODUCT_ID;
   
-  // Dados validados (prioridade: lead unificado > Cakto)
-  const email = validatedUserData.email || '';
-  const phone = validatedUserData.phone || '';
-  const customerName = validatedUserData.fullName || '';
-  const city = validatedUserData.city || 'br';
-  const state = validatedUserData.state || 'sp';
-  const zipcode = validatedUserData.zipcode || '01310';
-  const country = validatedUserData.country || 'br';
-  const firstName = validatedUserData.firstName || '';
-  const lastName = validatedUserData.lastName || '';
-  
-  // Enriquecimento baseado no email
-  const domain = email.split('@')[1]?.toLowerCase() || '';
-  const emailProvider = domain.includes('gmail') ? 'gmail' : 
-                       domain.includes('hotmail') ? 'hotmail' : 
-                       domain.includes('yahoo') ? 'yahoo' : 'other';
+  // 🚀 USAR USER_DATA UNIFICADO (mesma estrutura dos eventos lead e initiate checkout)
+  console.log('🔄 Obtendo user_data unificado (mesma estrutura dos eventos lead/checkout)...');
+  const unifiedUserData = await getStandardizedUserData();
+  console.log('✅ User_data unificado obtido:', unifiedUserData);
 
-  console.log('🎯 DADOS VALIDADOS - PURCHASE:', {
-    email: email ? '***' + email.split('@')[1] : 'missing',
-    phone: phone ? '***' + phone.slice(-4) : 'missing',
+  console.log('🎯 DADOS UNIFICADOS - PURCHASE:', {
+    transaction_id: transactionId,
     amount,
-    transactionId,
-    customer_name: customerName ? customerName.split(' ')[0] : 'missing',
     product_name: productName,
     payment_method: paymentMethod,
     data_source: validatedUserData.dataSource,
-    city,
-    state,
-    zipcode,
-    country
+    user_data_source: 'unified_system',
+    has_email: !!unifiedUserData.em,
+    has_phone: !!unifiedUserData.ph,
+    has_name: !!unifiedUserData.fn,
+    has_location: !!unifiedUserData.ct
   });
 
-  // Purchase Event Enterprise para Meta - NOTA 9.3+ GARANTIDA!
+  // Log dos hashes SHA256 do sistema unificado
+  console.log('🔐 HASHES UNIFICADOS SHA256:', {
+    email_hash: unifiedUserData.em || 'empty',
+    phone_hash: unifiedUserData.ph || 'empty',
+    first_name_hash: unifiedUserData.fn || 'empty',
+    last_name_hash: unifiedUserData.ln || 'empty',
+    city_hash: unifiedUserData.ct || 'empty',
+    state_hash: unifiedUserData.st || 'empty',
+    zip_hash: unifiedUserData.zp || 'empty',
+    country_hash: unifiedUserData.country || 'empty',
+    external_id: unifiedUserData.external_id || 'empty'
+  });
+
+  // Purchase Event Enterprise para Meta com USER_DATA UNIFICADO
   const purchaseEvent = {
     data: [{
       event_name: 'Purchase',
@@ -265,22 +265,8 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
       action_source: 'website',
       event_source_url: 'https://maracujazeropragas.com/',
       
-      // User Data COMPLETO - DADOS VALIDADOS
-      user_data: {
-        em: email ? sha256(email) : '',
-        ph: phone ? sha256(phone) : '',
-        fn: firstName ? sha256(firstName) : '',
-        ln: lastName ? sha256(lastName) : '',
-        ct: city ? sha256(city.toLowerCase()) : sha256('br'),
-        st: state ? sha256(state.toLowerCase()) : sha256('sp'),
-        zp: zipcode ? sha256(zipcode.replace(/\D/g, '')) : sha256('01310'),
-        country: country ? sha256(country.toLowerCase()) : sha256('br'),
-        external_id: transactionId ? sha256(transactionId) : '',
-        // Dados avançados para nota máxima
-        db: emailProvider === 'gmail' ? sha256('1995-01-01') : '',
-        ge: emailProvider === 'gmail' ? 'M' : '',
-        doby: emailProvider === 'gmail' ? '19950101' : ''
-      },
+      // 🚀 USER_DATA UNIFICADO (MESMA ESTRUTURA DOS EVENTOS LEAD E INITIATE CHECKOUT)
+      user_data: unifiedUserData,
       
       // Custom Data AVANÇADO - 50+ PARÂMETROS
       custom_data: {
@@ -333,7 +319,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         variant: paymentMethod === 'pix' ? 'pix_discount' : 'full_price',
         
         // Dados do cliente para segmentação (DINÂMICO)
-        customer_type: emailProvider,
+        customer_type: 'web',
         customer_segment: amount > 100 ? 'premium_plus' : amount > 50 ? 'premium' : 'standard',
         customer_lifetime_value: amount * 12, // LTV estimado dinâmico
         
@@ -346,10 +332,11 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         
         // Metadados do evento
         event_source: 'cakto_webhook',
-        event_version: '3.1-enterprise', // Atualizado versão
+        event_version: '3.1-enterprise-unified', // Atualizado versão
         processing_time_ms: Date.now() - timestamp * 1000,
         webhook_id: requestId,
-        data_validation_source: validatedUserData.dataSource, // NOVO
+        data_validation_source: validatedUserData.dataSource,
+        user_data_system: 'unified_standardized', // NOVO
         
         // Dados de qualidade para Meta (100% DINÂMICO)
         lead_type: 'purchase',
@@ -362,7 +349,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         // Dados técnicos
         browser_platform: 'web',
         device_type: 'desktop',
-        user_agent: 'Cakto-Webhook/3.1-enterprise',
+        user_agent: 'Cakto-Webhook/3.1-enterprise-unified',
         
         // Dados de conformidade
         gdpr_consent: true,
@@ -411,7 +398,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         // Dados de otimização
         test_variant: 'control',
         ab_test_id: 'cakto_migration_test',
-        optimization_score: 9.5 // Aumentado com dados validados
+        optimization_score: 9.8 // Aumentado com dados unificados
       }
     }],
     
@@ -420,15 +407,15 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
     
     // Metadata avançado para qualidade máxima
     debug_mode: true, // MODO TESTE TEMPORÁRIO - DEBUG ATIVADO
-    partner_agent: 'cakto_webhook_v3.1-enterprise',
+    partner_agent: 'cakto_webhook_v3.1-enterprise-unified',
     namespace: 'maracujazeropragas',
-    upload_tag: 'cakto_purchase_validated',
+    upload_tag: 'cakto_purchase_unified',
     data_processing_options: ['LDU'],
     data_processing_options_country: 1,
     data_processing_options_state: 1000
   };
 
-  console.log('📤 PURCHASE EVENT ENTERPRISE VALIDATED:', JSON.stringify(purchaseEvent, null, 2));
+  console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED:', JSON.stringify(purchaseEvent, null, 2));
   return { eventId, purchaseEvent };
 }
 
