@@ -89,124 +89,29 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
     enrichment_level: userData?.enrichment_level || 'basic'
   };
 
-  // Purchase Event enriquecido para Meta (nosso padrão avançado)
+  // Purchase Event simplificado para Meta (para debug)
   const purchaseEvent = {
     data: [{
       event_name: 'Purchase',
       event_id: eventId,
       event_time: timestamp,
       action_source: 'website',
-      event_source_url: 'https://maracujazeropragas.com/obrigado',
       
-      // User Data com hash SHA-256 (nível enterprise)
+      // User Data básico (sem hash por enquanto)
       user_data: {
-        // Dados principais com hash
-        em: sha256(enrichedData.primary_email),
-        ph: sha256(enrichedData.primary_phone),
-        fn: sha256(enrichedData.full_name || 'unknown'),
-        ct: sha256(enrichedData.city || 'unknown'),
-        st: sha256(enrichedData.state || 'unknown'),
-        zp: sha256(enrichedData.cep || '00000000'),
-        country: 'br',
-        
-        // Identificadores avançados para matching
-        external_id: sha256(enrichedData.primary_email),
-        subscription_id: sha256(`sub_${enrichedData.primary_transaction}`),
-        lead_id: sha256(`lead_${enrichedData.primary_email}`),
-        
-        // Dados de domínio para matching avançado
-        domain: sha256(enrichedData.email_domain),
-        
-        // Dados de dispositivo (padrão)
-        client_ip_address: allpesData.ip_address || '127.0.0.1',
-        client_user_agent: allpesData.user_agent || 'Mozilla/5.0 (Webhook Client)',
-        
-        // Cookies para cross-domain (se disponíveis)
-        fbc: allpesData.fbc || '',
-        fbp: allpesData.fbp || '',
-        
-        // Dados demográficos (enriquecidos)
-        db: enrichedData.full_name ? sha256('1990-01-01') : '', // Data padrão se tiver nome
-        ge: enrichedData.full_name ? sha256('unknown') : '', // Gênero padrão
-        
-        // Códigos de área para matching geográfico
-        area_code: enrichedData.primary_phone ? sha256(enrichedData.primary_phone.slice(0, 2)) : ''
+        em: enrichedData.primary_email,
+        ph: enrichedData.primary_phone,
+        country: 'br'
       },
       
-      // Custom Data com informações completas (nível avançado)
+      // Custom Data básico
       custom_data: {
-        // Dados da transação
         currency: 'BRL',
         value: enrichedData.primary_amount,
         content_ids: [enrichedData.primary_product],
-        content_name: 'Sistema 4 Fases - Ebook Trips',
+        content_name: 'Sistema 4 Fases',
         content_type: 'product',
-        transaction_id: enrichedData.primary_transaction,
-        order_id: `ORD_${timestamp}_${enrichedData.primary_transaction}`,
-        
-        // Dados de shipping e billing (enriquecidos)
-        shipping_address: {
-          country: 'BR',
-          city: enrichedData.city || 'Sao Paulo',
-          postal_code: enrichedData.cep || '01234567',
-          state: enrichedData.state || 'SP'
-        },
-        billing_address: {
-          country: 'BR',
-          city: enrichedData.city || 'Sao Paulo',
-          postal_code: enrichedData.cep || '01234567',
-          state: enrichedData.state || 'SP'
-        },
-        
-        // Dados de pagamento
-        payment_method: allpesData.payment_method || 'digital',
-        predicted_ltv: 159.6,
-        
-        // Dados do produto (completos)
-        num_items: 1,
-        product_catalog_id: META_PIXEL_ID,
-        
-        // Metadados de qualidade (nível enterprise)
-        delivery_category: 'home_delivery',
-        item_category: 'digital_guide',
-        brand: 'Maracuja Zero Pragas',
-        
-        // Dados de campanha (UTMs - se disponíveis)
-        utm_source: allpesData.utm_source || 'webhook',
-        utm_medium: allpesData.utm_medium || 'purchase',
-        utm_campaign: allpesData.utm_campaign || 'sistema_4_fases',
-        utm_term: allpesData.utm_term || '',
-        utm_content: allpesData.utm_content || '',
-        
-        // Dados de afiliação
-        affiliate_name: allpesData.affiliate_name || '',
-        sub_affiliate: allpesData.sub_affiliate || '',
-        
-        // Dados de sessão
-        session_id: allpesData.session_id || `sess_${timestamp}`,
-        page_view_id: allpesData.page_view_id || `pv_${timestamp}`,
-        
-        // Dados de dispositivo
-        device_type: allpesData.device_type || 'desktop',
-        os_version: allpesData.os_version || 'Webhook OS',
-        browser_version: allpesData.browser_version || 'Webhook Browser',
-        
-        // Dados de performance
-        response_time: Date.now() - timestamp * 1000,
-        server_timestamp: timestamp,
-        client_timestamp: allpesData.client_timestamp || timestamp,
-        
-        // Dados de qualidade (métricas avançadas)
-        quality_score: '9.8',
-        data_match_score: '0.98',
-        attribution_score: '0.95',
-        enrichment_score: userData?.enrichment_level === 'advanced' ? '0.95' : '0.85',
-        
-        // Metadados do sistema
-        webhook_version: '2.0',
-        processing_time_ms: Date.now() - timestamp * 1000,
-        data_source: enrichedData.data_source,
-        email_provider: enrichedData.email_provider
+        transaction_id: enrichedData.primary_transaction
       }
     }],
     
@@ -218,7 +123,14 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
   console.log('=== DEBUG COMPLETO ===');
   console.log('Pixel ID:', process.env.META_PIXEL_ID);
   console.log('Token (primeiros 20 chars):', process.env.META_ACCESS_TOKEN?.substring(0, 20));
+  console.log('Enriched Data:', JSON.stringify(enrichedData, null, 2));
+  console.log('Allpes Data:', JSON.stringify(allpesData, null, 2));
   console.log('Payload completo:', JSON.stringify(purchaseEvent, null, 2));
+  
+  // Forçar log a aparecer
+  console.error('=== ERRO FORÇADO PARA DEBUG ===');
+  console.error('Pixel ID:', process.env.META_PIXEL_ID);
+  console.error('Payload:', JSON.stringify(purchaseEvent, null, 2));
 
   // Log completo do payload sendo enviado
   console.log('📤 PAYLOAD COMPLETO ENVIADO PARA META:', JSON.stringify(purchaseEvent, null, 2));
