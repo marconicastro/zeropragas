@@ -55,11 +55,11 @@ function isDuplicate(eventId: string): boolean {
   processedEvents.set(eventId, now);
   
   // Limpar cache antigo
-  for (const [id, timestamp] of processedEvents.entries()) {
+  processedEvents.forEach((timestamp, id) => {
     if (now - timestamp > CACHE_TTL) {
       processedEvents.delete(id);
     }
-  }
+  });
   
   return false;
 }
@@ -82,7 +82,7 @@ function enrichCustomerData(customer: any, email: string) {
 }
 
 // Função para criar Purchase Event AVANÇADO para Meta
-async function createAdvancedPurchaseEvent(caktoData: any, enrichedCustomer: any) {
+async function createAdvancedPurchaseEvent(caktoData: any, enrichedCustomer: any, requestId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
   const eventId = `Purchase_${timestamp}_${Math.random().toString(36).substr(2, 8)}`;
   
@@ -122,10 +122,10 @@ async function createAdvancedPurchaseEvent(caktoData: any, enrichedCustomer: any
         ph: phone ? sha256(enrichedCustomer.phone_clean) : '',
         fn: customerName ? sha256(customerName) : '',
         ln: enrichedCustomer.last_name ? sha256(enrichedCustomer.last_name) : '',
-        ct: 'br',
-        st: 'sp',
-        zp: '01310',
-        country: 'br',
+        ct: sha256('br'), // Hash obrigatório pela Meta
+        st: sha256('sp'), // Hash obrigatório pela Meta
+        zp: sha256('01310'), // Hash obrigatório pela Meta
+        country: sha256('br'), // Hash obrigatório pela Meta
         external_id: transactionId ? sha256(transactionId) : '',
         // Dados avançados para nota máxima
         db: enrichedCustomer.email_provider === 'gmail' ? sha256('1995-01-01') : '',
@@ -170,7 +170,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, enrichedCustomer: any
         total_items: amount > 50 ? 2 : 1, // Quantidade de itens detectada
         
         // Métodos de entrega
-        delivery_category: 'digital',
+        delivery_category: 'home_delivery', // Valor aceito pela Meta
         shipping_tier: 'next_day',
         estimated_delivery_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         
@@ -392,6 +392,8 @@ async function sendToMetaWithRetry(eventData: any, eventType: string): Promise<a
 
 // Função principal do webhook Cakto ENTERPRISE
 export async function POST(request: NextRequest) {
+  console.log('🚀 WEBHOOK CAKTO CHAMADO - INÍCIO');
+  
   const startTime = Date.now();
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   
@@ -559,7 +561,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
   const enrichedCustomer = enrichCustomerData(data.customer, data.customer.email);
   
   // Criar e enviar Purchase Event
-  const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, enrichedCustomer);
+  const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, enrichedCustomer, requestId);
   const metaResult = await sendToMetaWithRetry(purchaseEvent, 'Purchase');
   
   console.log(`🎉 [${requestId}] PURCHASE ENVIADO! Event ID: ${eventId}`);
