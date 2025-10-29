@@ -214,6 +214,12 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
     test_event_code: process.env.NODE_ENV === 'development' ? 'TEST' : undefined
   };
 
+  // === DEBUG COMPLETO ===
+  console.log('=== DEBUG COMPLETO ===');
+  console.log('Pixel ID:', process.env.META_PIXEL_ID);
+  console.log('Token (primeiros 20 chars):', process.env.META_ACCESS_TOKEN?.substring(0, 20));
+  console.log('Payload completo:', JSON.stringify(purchaseEvent, null, 2));
+
   // Log completo do payload sendo enviado
   console.log('📤 PAYLOAD COMPLETO ENVIADO PARA META:', JSON.stringify(purchaseEvent, null, 2));
   console.log('🌐 URL DA META API:', `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`);
@@ -232,6 +238,20 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
     console.log('⏳ INICIANDO CHAMADA PARA META API...');
     const metaResponse = await fetch(metaUrl, options);
     const metaResult = await metaResponse.json();
+    
+    // Logs simplificados DEPOIS da resposta
+    console.log('Meta Status:', metaResponse.status);
+    console.log('Meta Response:', JSON.stringify(metaResult, null, 2));
+
+    if (!metaResponse.ok || metaResult.error) {
+      console.error('ERRO COMPLETO DA META:', {
+        status: metaResponse.status,
+        error: metaResult.error,
+        message: metaResult.error?.message,
+        error_user_title: metaResult.error?.error_user_title,
+        error_user_msg: metaResult.error?.error_user_msg
+      });
+    }
     
     // Log completo da resposta
     console.log('📥 RESPOSTA META STATUS HTTP:', metaResponse.status);
