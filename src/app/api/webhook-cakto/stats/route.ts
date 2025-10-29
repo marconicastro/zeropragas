@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
             .health-excellent { color: #10b981; }
             .health-good { color: #f59e0b; }
             .health-warning { color: #ef4444; }
+            .test-mode { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; font-weight: bold; box-shadow: 0 4px 6px rgba(251, 191, 36, 0.3); }
             .events-list { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
             .event-item { padding: 10px; border-bottom: 1px solid #eee; }
             .event-success { color: #10b981; }
@@ -62,6 +63,10 @@ export async function GET(request: NextRequest) {
         </head>
         <body>
           <div class="container">
+            <div class="test-mode">
+              🧪 MODO DE TESTE ATIVADO - Código: TEST10150 - Todos os eventos estão sendo enviados como teste para validação
+            </div>
+            
             <div class="header">
               <h1>🚀 Webhook Cakto Dashboard</h1>
               <p>Version: ${stats.version} | Health: <span class="health-${stats.health}">${stats.health.toUpperCase()}</span></p>
