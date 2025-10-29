@@ -15,6 +15,10 @@ import { useUTMs } from '@/hooks/use-utm';
 import { useUTMsV2 } from '@/hooks/use-utm-v2';
 
 export default function App() {
+  // 💰 CONFIGURAÇÃO DINÂMICA DE PREÇOS
+  const BASE_PRODUCT_PRICE = 39.90; // Valor base do produto
+  const [dynamicPrice, setDynamicPrice] = useState(BASE_PRODUCT_PRICE);
+  
   // 🎯 Hook de UTMs - Sistema próprio e seguro (v1.0)
   const { 
     utms, 
@@ -136,8 +140,8 @@ export default function App() {
       
       await fireViewContentDefinitivo({
         content_name: 'Sistema 4 Fases - Ebook Trips',
-        content_ids: ['339591'],
-        value: 39.90,
+        content_ids: ['hacr962'],
+        value: dynamicPrice, // VALOR DINÂMICO
         currency: 'BRL',
         content_type: 'product',
         trigger_type: triggerType,
@@ -215,8 +219,8 @@ export default function App() {
     secureParams['event_id'] = enterpriseIds.event_id;
     
     // Dados comerciais (sem informações pessoais)
-    secureParams['product_id'] = '339591';
-    secureParams['value'] = '39.90';
+    secureParams['product_id'] = 'hacr962';
+    secureParams['value'] = dynamicPrice.toString(); // VALOR DINÂMICO
     secureParams['currency'] = 'BRL';
     
     // 🎯 UTMs do nosso sistema próprio (apenas os principais)
@@ -265,10 +269,10 @@ export default function App() {
       
       // Dados comerciais completos
       commercial_data: {
-        product_id: '339591',
+        product_id: 'hacr962',
         product_name: 'Sistema 4 Fases - Ebook Trips',
         content_type: 'product',
-        value: 39.90,
+        value: dynamicPrice, // VALOR DINÂMICO
         currency: 'BRL'
       },
       
@@ -312,8 +316,8 @@ export default function App() {
     // ✅ NOVO: Salvar dados completos para backup de Purchase
     const purchaseIntent = {
       ...userDataToSave,
-      product_id: '339591',
-      value: 39.90,
+      product_id: 'hacr962',
+      value: dynamicPrice, // VALOR DINÂMICO
       currency: 'BRL',
       product_name: 'Sistema 4 Fases - Ebook Trips',
       secure_params: Object.keys(secureParams).map(key => `${key}=${secureParams[key]}`).join('&')
@@ -351,10 +355,10 @@ export default function App() {
 
     // Disparar evento InitiateCheckout com sistema definitivo
     await fireInitiateCheckoutDefinitivo({
-      value: 39.90,
+      value: dynamicPrice, // VALOR DINÂMICO
       currency: 'BRL',
       content_name: 'Sistema 4 Fases - Ebook Trips',
-      content_ids: ['339591'],
+      content_ids: ['hacr962'],
       content_type: 'product',
       num_items: 1,
       checkout_step: 1,
@@ -382,8 +386,8 @@ export default function App() {
     });
 
     // Construir URL final SEGURA (apenas IDs e dados comerciais)
-    // LINK ATUALIZADO: https://go.allpes.com.br/r1wl4qyyfv (novo link de pagamento)
-    const finalUrlString = `https://go.allpes.com.br/r1wl4qyyfv?${new URLSearchParams(secureParams).toString()}`;
+    // LINK ATUALIZADO: https://pay.cakto.com.br/hacr962_605077 (migrado para Cakto)
+    const finalUrlString = `https://pay.cakto.com.br/hacr962_605077?${new URLSearchParams(secureParams).toString()}`;
     
     console.log('🔗 URL SEGURA gerada:', finalUrlString);
     console.log('📊 Tamanho da URL:', finalUrlString.length, 'caracteres');
@@ -413,8 +417,8 @@ export default function App() {
   const scrollToCheckout = async () => {
     // Disparar evento específico de CTA
     await fireCTAClickDefinitivo('Quero Economizar', {
-      content_ids: ['339591'],
-      value: 39.90,
+      content_ids: ['hacr962'],
+      value: dynamicPrice, // VALOR DINÂMICO
       currency: 'BRL',
       content_type: 'product',
       cta_type: 'main_checkout_scroll',
@@ -428,8 +432,8 @@ export default function App() {
   const handleCheckoutRedirect = async (event) => {
     // Disparar evento específico de CTA final
     await fireCTAClickDefinitivo('Final Checkout', {
-      content_ids: ['339591'],
-      value: 39.90,
+      content_ids: ['hacr962'],
+      value: dynamicPrice, // VALOR DINÂMICO
       currency: 'BRL',
       content_type: 'product',
       cta_type: 'final_checkout_modal',
@@ -985,12 +989,12 @@ export default function App() {
                 </div>
 
                 {/* CTA Final - Responsivo */}
-                {/* LINK ATUALIZADO: https://go.allpes.com.br/r1wl4qyyfv (novo link de pagamento) */}
+                {/* LINK ATUALIZADO: https://pay.cakto.com.br/hacr962_605077 (migrado para Cakto) */}
                 <a 
-                  href="https://go.allpes.com.br/r1wl4qyyfv" 
+                  href="https://pay.cakto.com.br/hacr962_605077" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  id="botao-compra-allpes" 
+                  id="botao-compra-cakto" 
                   onClick={handleCheckoutRedirect}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 sm:py-8 px-4 sm:px-6 rounded-lg text-xl sm:text-2xl md:text-3xl transform hover:scale-105 transition-all duration-300 shadow-2xl inline-flex items-center justify-center gap-3 sm:gap-4"
                 >

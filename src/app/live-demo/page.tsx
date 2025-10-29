@@ -37,7 +37,7 @@ export default function LiveDemo() {
   const [isAutoRefresh, setIsAutoRefresh] = useState(false);
 
   // URL fornecida pelo usuário
-  const liveURL = "https://go.allpes.com.br/r1wl4qyyfv?session_id=sess_1761657099815_w408l&event_id=InitiateCheckout_1761657099815_w408l&product_id=339591&value=39.90&currency=BRL&source=maracujazeropragas&campaign=sistema_4_fases_v2&success_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/obrigado&cancel_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/checkout";
+  const liveURL = "https://go.allpes.com.br/r1wl4qyyfv?session_id=sess_1761657099815_w408l&event_id=InitiateCheckout_1761657099815_w408l&product_id=hacr962&value=39.90&currency=BRL&source=maracujazeropragas&campaign=sistema_4_fases_v2&success_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/obrigado&cancel_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/checkout";
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -172,7 +172,7 @@ export default function LiveDemo() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span>Product ID Consistente:</span>
-                      <Badge variant="default">339591</Badge>
+                      <Badge variant="default">hacr962</Badge>
                     </div>
                     <div className="flex justify-between items-center">
                       <span>Moeda Correta:</span>
@@ -239,7 +239,7 @@ export default function LiveDemo() {
                   <div>
                     <h4 className="font-medium mb-2">URL Original (Exemplo):</h4>
                     <code className="text-xs bg-gray-100 p-2 rounded block break-all">
-                      https://go.allpes.com.br/r1wl4qyyfv?session_id=sess_1761656180573_swacw&event_id=InitiateCheckout_1761656180573_swacw&product_id=339591&value=39.90&currency=BRL&source=maracujazeropragas&campaign=sistema_4_fases_v2&success_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/obrigado&cancel_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/checkout
+                      https://go.allpes.com.br/r1wl4qyyfv?session_id=sess_1761656180573_swacw&event_id=InitiateCheckout_1761656180573_swacw&product_id=hacr962&value=39.90&currency=BRL&source=maracujazeropragas&campaign=sistema_4_fases_v2&success_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/obrigado&cancel_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/checkout
                     </code>
                   </div>
                   
@@ -264,7 +264,7 @@ export default function LiveDemo() {
                       <h5 className="font-medium mb-2">Padrões Mantidos:</h5>
                       <ul className="space-y-1 text-xs">
                         <li>• Formato: sess_timestamp_suffix</li>
-                        <li>• Product ID: 339591 (constante)</li>
+                        <li>• Product ID: hacr962 (constante)</li>
                         <li>• Value: 39.90 BRL (constante)</li>
                         <li>• Source: maracujazeropragas</li>
                         <li>• Campaign: sistema_4_fases_v2</li>

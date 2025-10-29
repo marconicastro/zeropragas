@@ -13,9 +13,9 @@ export default function WebhookTestPage() {
     status: 'approved',
     customer_email: 'teste@exemplo.com',
     customer_phone: '+5511999999999',
-    amount: 97.00,
+    amount: 39.90,
     transaction_id: 'TEST_' + Date.now(),
-    product_id: '339591',
+    product_id: 'hacr962',
     payment_method: 'credit_card'
   });
 

@@ -462,7 +462,7 @@ export default function AfiliadoPage({ params }: { params: { codigo: string } })
     fireViewContentDefinitivo({
       content_name: 'Landing Page Afiliado',
       content_ids: ['produto_afiliado'],
-      value: 97.00,
+      value: 39.90,
       currency: 'BRL',
       content_category: 'affiliate_landing',
       affiliate_code: params.codigo,

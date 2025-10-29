@@ -33,7 +33,7 @@ export default function CheckoutURLProcessor({ onCheckoutData, showDebug = false
   const [validationMessage, setValidationMessage] = useState('');
 
   // URL de exemplo (a que você forneceu)
-  const exampleURL = "https://go.allpes.com.br/r1wl4qyyfv?session_id=sess_1761656180573_swacw&event_id=InitiateCheckout_1761656180573_swacw&product_id=339591&value=39.90&currency=BRL&source=maracujazeropragas&campaign=sistema_4_fases_v2&success_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/obrigado&cancel_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/checkout";
+  const exampleURL = "https://go.allpes.com.br/r1wl4qyyfv?session_id=sess_1761656180573_swacw&event_id=InitiateCheckout_1761656180573_swacw&product_id=hacr962&value=39.90&currency=BRL&source=maracujazeropragas&campaign=sistema_4_fases_v2&success_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/obrigado&cancel_url=https://preview-chat-d9ccdab3-710e-4b4a-b80f-92ba1dcc246c.space.z.ai/checkout";
 
   useEffect(() => {
     // Processar URL atual se houver dados de checkout

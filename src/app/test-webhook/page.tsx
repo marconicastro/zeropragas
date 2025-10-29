@@ -16,10 +16,18 @@ export default function TestWebhookPage() {
   const [testData, setTestData] = useState(`{
   "status": "approved",
   "customer_email": "cliente@example.com",
-  "amount": "97.00",
+  "amount": "39.90",
   "transaction_id": "test_123456",
-  "product_id": "339591"
+  "product_id": "hacr962"
 }`);
+
+  // 💰 Opções de valores dinâmicos para testes
+  const dynamicTestValues = {
+    base_product: "39.90",
+    with_order_bump: "67.80",
+    with_upsell: "97.70",
+    premium_package: "127.60"
+  };
 
   const testWebhook = async (endpoint: string) => {
     setLoading(true);
@@ -81,6 +89,61 @@ export default function TestWebhookPage() {
               />
             </div>
 
+            {/* 💰 Botões de Valores Dinâmicos */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">💰 Testar Valores Dinâmicos:</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newTestData = JSON.parse(testData);
+                    newTestData.amount = dynamicTestValues.base_product;
+                    setTestData(JSON.stringify(newTestData, null, 2));
+                  }}
+                  className="text-xs"
+                >
+                  Produto Base (R$ 39,90)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newTestData = JSON.parse(testData);
+                    newTestData.amount = dynamicTestValues.with_order_bump;
+                    setTestData(JSON.stringify(newTestData, null, 2));
+                  }}
+                  className="text-xs"
+                >
+                  + Order Bump (R$ 67,80)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newTestData = JSON.parse(testData);
+                    newTestData.amount = dynamicTestValues.with_upsell;
+                    setTestData(JSON.stringify(newTestData, null, 2));
+                  }}
+                  className="text-xs"
+                >
+                  + Upsell (R$ 97,70)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newTestData = JSON.parse(testData);
+                    newTestData.amount = dynamicTestValues.premium_package;
+                    setTestData(JSON.stringify(newTestData, null, 2));
+                  }}
+                  className="text-xs"
+                >
+                  Premium (R$ 127,60)
+                </Button>
+              </div>
+            </div>
+
             <div className="flex gap-2 flex-wrap">
               <Button
                 onClick={() => testWebhook('/api/webhook-allpes')}
@@ -92,7 +155,20 @@ export default function TestWebhookPage() {
                 ) : (
                   <CheckCircle className="h-4 w-4" />
                 )}
-                Testar Webhook Principal
+                Testar Allpes
+              </Button>
+
+              <Button
+                onClick={() => testWebhook('/api/webhook-cakto')}
+                disabled={loading}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+                Testar Cakto ✅
               </Button>
 
               <Button
@@ -106,7 +182,7 @@ export default function TestWebhookPage() {
                 ) : (
                   <Bug className="h-4 w-4" />
                 )}
-                Testar Debug Webhook
+                Debug Allpes
               </Button>
             </div>
           </CardContent>
@@ -152,18 +228,100 @@ export default function TestWebhookPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
+            <div className="text-sm font-medium text-green-600 mb-2">🏆 CAKTO - Estrutura Perfeita:</div>
+            <Button
+              variant="outline"
+              onClick={() => setTestData(`{
+  "secret": "12f4848f-35e9-41a8-8da4-1032642e3e89",
+  "event": "purchase_approved",
+  "data": {
+    "id": "81b408ee-2a91-427d-80bd-226cbeae1fa0",
+    "customer": {
+      "name": "Example",
+      "email": "cliente@example.com",
+      "phone": "34999999999"
+    },
+    "amount": 39.90,
+    "status": "paid",
+    "product": {
+      "name": "Sistema 4 Fases",
+      "short_id": "hacr962"
+    },
+    "paymentMethod": "pix"
+  }
+}`)}
+              className="w-full justify-start border-green-200 bg-green-50"
+            >
+              ✅ Cakto - Compra Aprovada (SECRET REAL)
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => setTestData(`{
+  "secret": "12f4848f-35e9-41a8-8da4-1032642e3e89",
+  "event": "checkout_abandonment",
+  "data": {
+    "offer": {
+      "id": "hacr962",
+      "name": "Sistema 4 Fases",
+      "price": 39.90
+    },
+    "product": {
+      "name": "Sistema 4 Fases",
+      "short_id": "hacr962"
+    },
+    "customerName": "João Silva",
+    "customerEmail": "joao@email.com",
+    "customerCellphone": "34999999999",
+    "checkoutUrl": "https://pay.cakto.com.br/hacr962_605077",
+    "createdAt": "2024-08-22T11:37:31.083758-03:00"
+  }
+}`)}
+              className="w-full justify-start border-blue-200 bg-blue-50"
+            >
+              🛒 Cakto - Abandono de Checkout (SECRET REAL)
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => setTestData(`{
+  "secret": "12f4848f-35e9-41a8-8da4-1032642e3e89",
+  "event": "purchase_refused",
+  "data": {
+    "id": "refused_123456",
+    "customer": {
+      "name": "Maria Santos",
+      "email": "maria@email.com",
+      "phone": "11999999999"
+    },
+    "amount": 39.90,
+    "status": "refused",
+    "product": {
+      "name": "Sistema 4 Fases",
+      "short_id": "hacr962"
+    },
+    "paymentMethod": "credit_card",
+    "reason": "Cartão negado pelo banco"
+  }
+}`)}
+              className="w-full justify-start border-red-200 bg-red-50"
+            >
+              ❌ Cakto - Compra Recusada (SECRET REAL)
+            </Button>
+
+            <div className="text-sm font-medium text-orange-600 mb-2 mt-4">🔧 ALLPES - Testes:</div>
             <Button
               variant="outline"
               onClick={() => setTestData(`{
   "status": "approved",
   "customer_email": "cliente@example.com",
-  "amount": "97.00",
+  "amount": "39.90",
   "transaction_id": "test_123456",
-  "product_id": "339591"
+  "product_id": "hacr962"
 }`)}
               className="w-full justify-start"
             >
-              Estrutura Padrão (customer_email, amount)
+              Allpes - Estrutura Padrão (customer_email, amount)
             </Button>
 
             <Button
@@ -171,13 +329,13 @@ export default function TestWebhookPage() {
               onClick={() => setTestData(`{
   "status": "paid",
   "email": "user@test.com",
-  "value": "97.00",
+  "value": "39.90",
   "order_id": "order_789",
-  "product_id": "339591"
+  "product_id": "hacr962"
 }`)}
               className="w-full justify-start"
             >
-              Estrutura Alternativa (email, value, order_id)
+              Allpes - Estrutura Alternativa (email, value, order_id)
             </Button>
 
             <Button
@@ -185,27 +343,13 @@ export default function TestWebhookPage() {
               onClick={() => setTestData(`{
   "status": "completed",
   "buyer_email": "comprador@site.com",
-  "total": "97.00",
+  "total": "39.90",
   "id": "payment_456",
-  "product_id": "339591"
+  "product_id": "hacr962"
 }`)}
               className="w-full justify-start"
             >
-              Estrutura Variante (buyer_email, total, id)
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={() => setTestData(`{
-  "status": "approved",
-  "client_email": "cliente@dominio.com",
-  "price": "97.00",
-  "payment_id": "pay_123",
-  "product_id": "339591"
-}`)}
-              className="w-full justify-start"
-            >
-              Estrutura Cliente (client_email, price, payment_id)
+              Allpes - Estrutura Variante (buyer_email, total, id)
             </Button>
           </CardContent>
         </Card>
@@ -216,14 +360,20 @@ export default function TestWebhookPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <div>
-              <strong>Webhook Principal:</strong>
-              <code className="block bg-muted p-2 rounded text-sm break-all">
+              <strong>🏆 Cakto Webhook (RECOMENDADO):</strong>
+              <code className="block bg-green-50 p-2 rounded text-sm break-all border-green-200">
+                https://maracujazeropragas.com/api/webhook-cakto
+              </code>
+            </div>
+            <div>
+              <strong>🔧 Allpes Webhook (legado):</strong>
+              <code className="block bg-orange-50 p-2 rounded text-sm break-all border-orange-200">
                 https://maracujazeropragas.com/api/webhook-allpes
               </code>
             </div>
             <div>
-              <strong>Debug Webhook:</strong>
-              <code className="block bg-muted p-2 rounded text-sm break-all">
+              <strong>🐛 Debug Allpes:</strong>
+              <code className="block bg-gray-50 p-2 rounded text-sm break-all">
                 https://maracujazeropragas.com/api/debug-allpes
               </code>
             </div>

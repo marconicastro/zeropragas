@@ -393,7 +393,7 @@ export async function firePageViewDefinitivo(customParams: any = {}) {
     // 🎯 DADOS COMERCIAIS COMPLETOS (idêntico ViewContent)
     value: 39.9,
     currency: 'BRL',
-    content_ids: ['339591'],
+    content_ids: ['hacr962'],
     content_type: 'product',
     content_name: 'Sistema 4 Fases - Ebook Trips',
     content_category: 'digital_product',
@@ -442,7 +442,7 @@ export async function fireViewContentDefinitivo(customParams: any = {}) {
   return fireMetaEventDefinitivo('ViewContent', {
     value: 39.9,
     currency: 'BRL',
-    content_ids: ['339591'],
+    content_ids: ['hacr962'],
     content_type: 'product',
     content_name: 'Sistema 4 Fases - Ebook Trips',
     content_category: 'digital_product',
@@ -526,7 +526,7 @@ export async function fireInitiateCheckoutDefinitivo(customParams: any = {}) {
   return fireMetaEventDefinitivo('InitiateCheckout', {
     value: 39.9,
     currency: 'BRL',
-    content_ids: ['339591'],
+    content_ids: ['hacr962'],
     content_type: 'product',
     content_name: 'Sistema 4 Fases - Ebook Trips',
     content_category: 'digital_product',
