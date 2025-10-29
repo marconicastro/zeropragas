@@ -636,12 +636,13 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Stats atualizadas:`, JSON.stringify(stats, null, 2));
 
     // 8. Atualizar dashboard de estatísticas
+    // Nota: userDataFromDB não está disponível aqui, então usamos uma fonte genérica
     await updateStats({
       eventType: eventType,
       transactionId: data.id || 'unknown',
       success: true,
       processingTime: processingTime,
-      dataSource: userDataFromDB.email ? 'database_lead' : 'api_geolocation'
+      dataSource: 'processed_successfully'
     });
 
     // 9. Retornar resposta enterprise
