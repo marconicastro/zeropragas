@@ -76,6 +76,12 @@ async function findUnifiedLead(email?: string, phone?: string): Promise<any> {
   if (!email && !phone) return null;
   
   try {
+    // Verificar se o banco está disponível
+    if (!db || typeof db.leadUserData !== 'function') {
+      console.log('⚠️ Banco de dados não disponível, usando fallback para Cakto...');
+      return null;
+    }
+    
     let lead = null;
     
     // Tentar buscar por email primeiro
@@ -96,6 +102,7 @@ async function findUnifiedLead(email?: string, phone?: string): Promise<any> {
     return lead;
   } catch (error) {
     console.error('❌ Erro ao buscar lead unificado:', error);
+    console.log('⚠️ Usando fallback para dados da Cakto...');
     return null;
   }
 }
@@ -155,6 +162,12 @@ async function getValidatedUserData(caktoCustomer: any) {
 // Função para registrar evento Cakto no banco
 async function registerCaktoEvent(eventData: any, validatedData: any, metaResponse: any, processingTime: number) {
   try {
+    // Verificar se o banco está disponível
+    if (!db || typeof db.caktoEvent !== 'function') {
+      console.log('⚠️ Banco de dados não disponível, pulando registro...');
+      return null;
+    }
+    
     const eventRecord = await db.caktoEvent.create({
       data: {
         eventId: eventData.eventId,
@@ -193,6 +206,8 @@ async function registerCaktoEvent(eventData: any, validatedData: any, metaRespon
     
   } catch (error) {
     console.error('❌ Erro ao registrar evento no banco:', error);
+    // Não falhar o webhook se o banco der erro
+    console.log('⚠️ Continuando processamento mesmo sem registro no banco...');
     return null;
   }
 }
@@ -700,7 +715,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
   const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, validatedUserData, requestId);
   const metaResult = await sendToMetaWithRetry(purchaseEvent, 'Purchase');
   
-  // 🔥 NOVO: Registrar evento no banco
+  // 🔥 NOVO: Registrar evento no banco (com fallback seguro)
   const processingTime = Date.now() - startTime;
   const eventData = {
     eventId,
@@ -716,7 +731,12 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
     caktoName: data.customer?.name
   };
   
-  await registerCaktoEvent(eventData, validatedUserData, metaResult, processingTime);
+  // Tentar registrar no banco, mas não falhar se der erro
+  try {
+    await registerCaktoEvent(eventData, validatedUserData, metaResult, processingTime);
+  } catch (dbError) {
+    console.log('⚠️ Registro no banco falhou, mas webhook continuou normalmente');
+  }
   
   console.log(`🎉 [${requestId}] PURCHASE VALIDADO ENVIADO! Event ID: ${eventId}`);
   
