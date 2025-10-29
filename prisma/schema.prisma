@@ -30,3 +30,73 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Tabela para User Data Unificado - Sistema Enterprise
+model LeadUserData {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  phone           String?
+  firstName       String?
+  lastName        String?
+  fullName        String?
+  city            String?
+  state           String?
+  zipcode         String?
+  country         String?
+  
+  // Metadados de captura
+  captureSource   String   @default("website") // website, facebook, google
+  capturePage     String?  // URL da página de captura
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  ipAddress       String?
+  userAgent       String?
+  
+  // Controle de validação
+  validated       Boolean  @default(false)
+  validationDate  DateTime?
+  
+  // Relacionamento com eventos
+  caktoEvents     CaktoEvent[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Tabela para registrar eventos Cakto recebidos
+model CaktoEvent {
+  id              String   @id @default(cuid())
+  eventId         String   @unique
+  eventType       String   // purchase_approved, checkout_abandonment, etc.
+  transactionId   String?
+  amount          Float?
+  productId       String?
+  productName     String?
+  paymentMethod   String?
+  status          String?
+  
+  // Dados recebidos da Cakto
+  caktoEmail      String?
+  caktoPhone      String?
+  caktoName       String?
+  
+  // Dados usados na Meta (após validação)
+  usedEmail       String?
+  usedPhone       String?
+  usedName        String?
+  usedCity        String?
+  usedState       String?
+  usedZipcode     String?
+  usedCountry     String?
+  
+  // Controle de processamento
+  leadDataId      String?
+  lead            LeadUserData? @relation(fields: [leadDataId], references: [id])
+  processingTime  Int?     // ms
+  metaSuccess     Boolean  @default(false)
+  metaResponse    String?  // JSON da resposta
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
