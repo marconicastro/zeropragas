@@ -67,13 +67,19 @@ async function sendPurchaseToMeta(allpesData: any, userData: any) {
   const timestamp = Math.floor(Date.now() / 1000);
   const eventId = `Purchase_${timestamp}_${Math.random().toString(36).substr(2, 5)}`;
 
+  // Extrair dados com múltiplos nomes possíveis
+  const email = allpesData.customer_email || allpesData.email || allpesData.buyer_email || '';
+  const phone = allpesData.customer_phone || allpesData.phone || allpesData.buyer_phone || '';
+  const amount = allpesData.amount || allpesData.value || allpesData.total || allpesData.price || 0;
+  const transactionId = allpesData.transaction_id || allpesData.order_id || allpesData.id || '';
+
   // Sistema avançado de enriquecimento de dados
   const enrichedData = {
     // Dados principais da Allpes
-    primary_email: allpesData.customer_email || '',
-    primary_phone: allpesData.customer_phone?.replace(/\D/g, '') || '',
-    primary_amount: allpesData.amount || 0,
-    primary_transaction: allpesData.transaction_id || '',
+    primary_email: email,
+    primary_phone: phone?.replace(/\D/g, '') || '',
+    primary_amount: amount,
+    primary_transaction: transactionId,
     primary_product: allpesData.product_id || '339591',
     
     // Dados enriquecidos (se disponíveis)
@@ -235,6 +241,19 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Receber e validar dados da Allpes
     const allpesData = await request.json();
+    
+    // Log completo para debug
+    console.log('📥 DADOS COMPLETOS RECEBIDOS DA ALLPES:', JSON.stringify(allpesData, null, 2));
+    console.log('📋 TODOS OS CAMPOS DISPONÍVEIS:', Object.keys(allpesData));
+    console.log('📋 VALORES DOS CAMPOS PRINCIPAIS:', {
+      customer_email: allpesData.customer_email,
+      email: allpesData.email,
+      amount: allpesData.amount,
+      value: allpesData.value,
+      total: allpesData.total,
+      status: allpesData.status
+    });
+    
     console.log('📥 Dados recebidos da Allpes:', {
       ...allpesData,
       customer_email: allpesData.customer_email ? '***' + allpesData.customer_email.split('@')[1] : 'missing'
@@ -253,9 +272,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validar estrutura essencial dos dados
-    const requiredFields = ['status', 'customer_email', 'amount'];
+    // 3. Validar estrutura essencial dos dados (aceitar múltiplos nomes)
+    const email = allpesData.customer_email || allpesData.email || allpesData.buyer_email || '';
+    const amount = allpesData.amount || allpesData.value || allpesData.total || allpesData.price || '0';
+    
+    console.log('🔍 CAMPOS EXTRAÍDOS:', { email: email ? '***' + email.split('@')[1] : 'missing', amount });
+    
+    const requiredFields = ['status'];
     const missingFields = requiredFields.filter(field => !allpesData[field]);
+    
+    // Validação personalizada para email e amount
+    if (!email) {
+      console.log('❌ Email não encontrado em nenhum campo');
+      missingFields.push('email');
+    }
+    
+    if (!amount || amount === '0') {
+      console.log('❌ Amount não encontrado ou é zero');
+      missingFields.push('amount');
+    }
     
     if (missingFields.length > 0) {
       console.log('❌ Campos essenciais faltando:', missingFields);
@@ -284,7 +319,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Enriquecer dados do usuário (sistema avançado)
-    const userData = await getUserData(allpesData.customer_email);
+    const userData = await getUserData(email);
     console.log('🎯 Dados enriquecidos:', {
       email_domain: userData.domain,
       email_provider: userData.email_provider,
