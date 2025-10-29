@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
-import { getStandardizedUserData } from '@/lib/unifiedUserData';
+import { getStandardizedUserDataServer } from '@/lib/serverUserData';
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
@@ -225,9 +225,25 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
   const paymentMethod = caktoData.paymentMethod || 'unknown';
   const offerId = caktoData.offer?.id || CAKTO_PRODUCT_ID;
   
-  // 🚀 USAR USER_DATA UNIFICADO (mesma estrutura dos eventos lead e initiate checkout)
-  console.log('🔄 Obtendo user_data unificado (mesma estrutura dos eventos lead/checkout)...');
-  const unifiedUserData = await getStandardizedUserData();
+  // Dados do cliente da Cakto
+  const customerEmail = caktoData.customer?.email || '';
+  const customerPhone = caktoData.customer?.phone || '';
+  const customerName = caktoData.customer?.name || '';
+  const customerCity = caktoData.customer?.address?.city || '';
+  const customerState = caktoData.customer?.address?.state || '';
+  const customerZipcode = caktoData.customer?.address?.zipcode || '';
+  
+  // 🚀 USAR USER_DATA UNIFICADO SERVER-SIDE (mesma estrutura dos eventos lead e initiate checkout)
+  console.log('🔄 Obtendo user_data unificado server-side (mesmo padrão lead/checkout)...');
+  const unifiedUserData = await getStandardizedUserDataServer(
+    customerEmail,
+    customerPhone,
+    customerName,
+    customerCity,
+    customerState,
+    customerZipcode,
+    transactionId
+  );
   console.log('✅ User_data unificado obtido:', unifiedUserData);
 
   console.log('🎯 DADOS UNIFICADOS - PURCHASE:', {
@@ -236,7 +252,10 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
     product_name: productName,
     payment_method: paymentMethod,
     data_source: validatedUserData.dataSource,
-    user_data_source: 'unified_system',
+    user_data_source: 'unified_server_side',
+    customer_email: customerEmail ? '***' + customerEmail.split('@')[1] : 'missing',
+    customer_phone: customerPhone ? '***' + customerPhone.slice(-4) : 'missing',
+    customer_name: customerName ? customerName.split(' ')[0] : 'missing',
     has_email: !!unifiedUserData.em,
     has_phone: !!unifiedUserData.ph,
     has_name: !!unifiedUserData.fn,
@@ -332,11 +351,11 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         
         // Metadados do evento
         event_source: 'cakto_webhook',
-        event_version: '3.1-enterprise-unified', // Atualizado versão
+        event_version: '3.1-enterprise-unified-server', // Atualizado versão
         processing_time_ms: Date.now() - timestamp * 1000,
         webhook_id: requestId,
         data_validation_source: validatedUserData.dataSource,
-        user_data_system: 'unified_standardized', // NOVO
+        user_data_system: 'unified_server_side', // NOVO
         
         // Dados de qualidade para Meta (100% DINÂMICO)
         lead_type: 'purchase',
@@ -349,7 +368,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
         // Dados técnicos
         browser_platform: 'web',
         device_type: 'desktop',
-        user_agent: 'Cakto-Webhook/3.1-enterprise-unified',
+        user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server',
         
         // Dados de conformidade
         gdpr_consent: true,
@@ -407,15 +426,15 @@ async function createAdvancedPurchaseEvent(caktoData: any, validatedUserData: an
     
     // Metadata avançado para qualidade máxima
     debug_mode: true, // MODO TESTE TEMPORÁRIO - DEBUG ATIVADO
-    partner_agent: 'cakto_webhook_v3.1-enterprise-unified',
+    partner_agent: 'cakto_webhook_v3.1-enterprise-unified-server',
     namespace: 'maracujazeropragas',
-    upload_tag: 'cakto_purchase_unified',
+    upload_tag: 'cakto_purchase_unified_server',
     data_processing_options: ['LDU'],
     data_processing_options_country: 1,
     data_processing_options_state: 1000
   };
 
-  console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED:', JSON.stringify(purchaseEvent, null, 2));
+  console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED SERVER:', JSON.stringify(purchaseEvent, null, 2));
   return { eventId, purchaseEvent };
 }
 
