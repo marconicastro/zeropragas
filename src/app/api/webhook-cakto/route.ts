@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
-import { fireHybridPurchaseEventWithFallbackServer } from '@/lib/hybridPurchaseFiring-server';
-
-// 🧪 MODO TESTE ATIVADO - CÓDIGO: TEST35751
-// ⚠️  WEBHOOK CONFIGURADO PARA AMBIENTE DE TESTES
-// ✅  TODOS OS EVENTOS SERÃO ENVIADOS COM test_event_code: 'TEST35751'
-// 📊  DEBUG_MODE ATIVADO PARA LOGS DETALHADOS
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
@@ -100,34 +94,6 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
   // 🚀 USAR SUA ESTRUTURA user_data COMPLETA (IGUAL LEAD E CHECKOUT)
   console.log('🔄 Obtendo user_data COMPLETO igual aos outros eventos...');
   
-  // 🔍 BUSCAR DADOS DO NAVEGADOR (FBP/FBC)
-  let browserDataFromDB = null;
-  try {
-    // Tentar encontrar dados do navegador recentes para este usuário
-    if (customerEmail) {
-      const recentBrowserData = await db.browserData.findFirst({
-        where: {
-          timestamp: {
-            gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Últimas 24h
-          }
-        },
-        orderBy: { timestamp: 'desc' }
-      });
-      
-      if (recentBrowserData) {
-        browserDataFromDB = recentBrowserData;
-        console.log('✅ Dados do navegador encontrados:', {
-          sessionId: recentBrowserData.sessionId,
-          has_fbp: !!recentBrowserData.fbp,
-          has_fbc: !!recentBrowserData.fbc,
-          timestamp: recentBrowserData.timestamp
-        });
-      }
-    }
-  } catch (error) {
-    console.log('⚠️ Erro ao buscar dados do navegador:', error);
-  }
-  
   // Buscar dados do usuário no banco de dados (mesma lógica do seu sistema)
   let userDataFromDB = null;
   if (customerEmail || customerPhone) {
@@ -214,10 +180,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     country: sha256('br'),
     external_id: transactionId || `cakto_${Date.now()}`,
     client_ip_address: null, // CORRETO: null no backend
-    client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server',
-    // 🚀 FBP/FBC - Do banco de dados do navegador
-    fbp: browserDataFromDB?.fbp || caktoData.browserData?.fbp || null,
-    fbc: browserDataFromDB?.fbc || caktoData.browserData?.fbc || null
+    client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server'
   };
   
   console.log('✅ User_data COMPLETO gerado (sua estrutura):', {
@@ -227,15 +190,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     has_location: !!unifiedUserData.ct,
     city_original: userDataFromDB.city,
     state_original: userDataFromDB.state,
-    source: userDataFromDB.email ? 'database_lead' : 'api_geolocation',
-    // 🚀 FBP/FBC Tracking
-    has_fbp: !!unifiedUserData.fbp,
-    has_fbc: !!unifiedUserData.fbc,
-    fbp_value: unifiedUserData.fbp || 'not_provided',
-    fbc_value: unifiedUserData.fbc || 'not_provided',
-    fbp_source: browserDataFromDB?.fbp ? 'database_browser' : caktoData.browserData?.fbp ? 'cakto_provided' : 'not_available',
-    fbc_source: browserDataFromDB?.fbc ? 'database_browser' : caktoData.browserData?.fbc ? 'cakto_provided' : 'not_available',
-    browser_session_id: browserDataFromDB?.sessionId || 'no_session'
+    source: userDataFromDB.email ? 'database_lead' : 'api_geolocation'
   });
 
   console.log('🎯 DADOS COMPLETOS - PURCHASE:', {
@@ -416,11 +371,11 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST35751', // MODO TESTE - CÓDIGO: TEST35751
+    test_event_code: '', // MODO PRODUÇÃO - SEM TESTE
     
     // Metadata avançado para qualidade máxima
-    debug_mode: true, // MODO TESTE - DEBUG ATIVADO PARA TESTES
-    partner_agent: 'cakto_webhook_v3.1-enterprise-unified-server-TEST',
+    debug_mode: false, // MODO PRODUÇÃO - DEBUG DESATIVADO
+    partner_agent: 'cakto_webhook_v3.1-enterprise-unified-server',
     namespace: 'maracujazeropragas',
     upload_tag: 'cakto_purchase_unified_server',
     data_processing_options: ['LDU'],
@@ -428,7 +383,6 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     data_processing_options_state: 1000
   };
 
-  console.log('🧪 WEBHOOK EM MODO TESTE - CÓDIGO: TEST35751');
   console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED SERVER:', JSON.stringify(purchaseEvent, null, 2));
   return { eventId, purchaseEvent };
 }
@@ -480,10 +434,9 @@ async function createLeadEvent(caktoData: any) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST35751', // MODO TESTE - CÓDIGO: TEST35751
+    test_event_code: '', // MODO PRODUÇÃO - SEM TESTE
   };
 
-  console.log('🧪 WEBHOOK EM MODO TESTE - CÓDIGO: TEST35751');
   console.log('📤 LEAD EVENT (ABANDONMENT):', JSON.stringify(leadEvent, null, 2));
   return { eventId, leadEvent };
 }
@@ -585,7 +538,6 @@ function updateStats(eventData: any) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🧪 WEBHOOK CAKTO EM MODO TESTE - CÓDIGO: TEST35751');
   console.log('🚀 WEBHOOK CAKTO CHAMADO - INÍCIO');
   
   const startTime = Date.now();
@@ -754,113 +706,39 @@ export async function POST(request: NextRequest) {
 
 // Handler para purchase_approved COM VALIDAÇÃO CRUZADA
 async function handlePurchaseApproved(data: any, requestId: string, startTime: number) {
-  console.log(`💰 [${requestId}] PROCESSANDO PURCHASE_APPROVED COM SISTEMA HÍBRIDO`);
-  console.log(`🛡️ [${requestId}] GARANTIA: Eventos Lead/InitiateCheckout NÃO alterados`);
+  console.log(`💰 [${requestId}] PROCESSANDO PURCHASE_APPROVED COM VALIDAÇÃO CRUZADA`);
 
   // Validar campos essenciais
   if (!data.customer?.email || !data.amount || data.status !== 'paid') {
     throw new Error('Campos essenciais ausentes: customer.email, amount, status=paid');
   }
 
-  console.log(`✅ [${requestId}] Processando purchase_approved com sistema híbrido...`);
+  console.log(`✅ [${requestId}] Processando purchase_approved...`);
   
-  // 🚀 SISTEMA HÍBRIDO - Usar dados preparados + dados da Cakto
-  console.log('🔄 [HÍBRIDO] Iniciando sistema híbrido de Purchase...');
+  // Criar e enviar Purchase Event COM SUA ESTRUTURA COMPLETA
+  const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, requestId);
+  const metaResult = await sendToMetaWithRetry(purchaseEvent, 'Purchase');
   
-  try {
-    // Disparar Purchase Event Híbrido
-    const hybridSuccess = await fireHybridPurchaseEventWithFallbackServer(data);
-    
-    if (hybridSuccess) {
-      console.log('✅ [HÍBRIDO] Purchase Event Híbrido disparado com sucesso!');
-      
-      // Registrar evento no banco (se disponível)
-      try {
-        await db.caktoEvent.create({
-          data: {
-            eventId: `HybridPurchase_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-            eventType: 'purchase_approved',
-            transactionId: data.id,
-            amount: data.amount,
-            productId: data.product?.short_id || CAKTO_PRODUCT_ID,
-            productName: data.product?.name || 'Sistema 4 Fases',
-            paymentMethod: data.paymentMethod,
-            status: 'completed',
-            caktoEmail: data.customer?.email,
-            caktoPhone: data.customer?.phone,
-            caktoName: data.customer?.name,
-            metaSuccess: true,
-            metaResponse: JSON.stringify({ 
-              hybrid_system: true, 
-              success: true,
-              guarantee: 'Eventos existentes preservados'
-            }),
-            processingTime: Date.now() - startTime
-          }
-        });
-      } catch (dbError) {
-        console.log('⚠️ Banco não disponível para registro');
-      }
-      
-      return {
-        success: true,
-        message: 'Purchase Event Híbrido processado com sucesso',
-        eventId: `HybridPurchase_${Date.now()}`,
-        processingTime: Date.now() - startTime,
-        hybridSystem: true,
-        guarantee: 'Eventos Lead/InitiateCheckout 100% preservados',
-        testMode: {
-          enabled: true,
-          testCode: 'TEST35751',
-          debugMode: true
-        }
-      };
-      
-    } else {
-      console.error('❌ [HÍBRIDO] Falha no Purchase Event Híbrido');
-      
-      // Fallback: tentar sistema antigo
-      console.log('🔄 [FALLBACK] Tentando sistema antigo como backup...');
-      const fallbackResult = await createAdvancedPurchaseEvent(data, requestId);
-      const fallbackSuccess = await sendToMetaWithRetry(fallbackResult, 'Purchase');
-      
-      if (fallbackSuccess) {
-        console.log('✅ [FALLBACK] Sistema antigo funcionou como backup');
-        return {
-          success: true,
-          message: 'Purchase processado via fallback',
-          fallbackUsed: true,
-          guarantee: 'Eventos existentes preservados',
-          testMode: { enabled: true, testCode: 'TEST35751' }
-        };
-      } else {
-        throw new Error('Ambos sistemas falharam');
-      }
+  console.log(`🎉 [${requestId}] PURCHASE COM SUA ESTRUTURA ENVIADO! Event ID: ${eventId}`);
+  
+  return {
+    event_type: 'purchase_approved',
+    meta_event_id: eventId,
+    meta_response: metaResult,
+    validation_data: {
+      data_source: 'database_lead_or_api_geolocation',
+      structure: 'complete_like_other_events',
+      used_email: data.customer?.email ? '***' + data.customer.email.split('@')[1] : 'missing',
+      used_phone: data.customer?.phone ? '***' + data.customer.phone.slice(-4) : 'missing',
+      used_city: 'from_database_or_api',
+      used_state: 'from_database_or_api'
+    },
+    transaction_data: {
+      id: data.id,
+      amount: data.amount,
+      payment_method: data.paymentMethod
     }
-    
-  } catch (hybridError) {
-    console.error('❌ [HÍBRIDO] Erro no sistema híbrido:', hybridError);
-    
-    // Fallback total
-    try {
-      console.log('🔄 [FALLBACK] Executando fallback total...');
-      const fallbackResult = await createAdvancedPurchaseEvent(data, requestId);
-      await sendToMetaWithRetry(fallbackResult, 'Purchase');
-      
-      return {
-        success: true,
-        message: 'Purchase processado via fallback total',
-        fallbackUsed: true,
-        error: hybridError.message,
-        guarantee: 'Eventos existentes preservados',
-        testMode: { enabled: true, testCode: 'TEST35751' }
-      };
-      
-    } catch (fallbackError) {
-      console.error('❌ [FALLBACK] Falha total no processamento');
-      throw fallbackError;
-    }
-  }
+  };
 }
 
 // Handler para checkout_abandonment

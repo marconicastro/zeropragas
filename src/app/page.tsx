@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Script from 'next/script';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
@@ -10,11 +9,8 @@ import { fireScrollDepthDefinitivo, fireViewContentDefinitivo, fireCTAClickDefin
 import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
-import { createPreparedPurchaseEvent, storePreparedPurchaseEvent, storeFallbackUserData } from '@/lib/purchaseEventPreparation';
 
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
-import PreparedDataSender from '@/components/PreparedDataSender';
-import HybridSystemTester from '@/components/HybridSystemTester';
 import { useUTMs } from '@/hooks/use-utm';
 import { useUTMsV2 } from '@/hooks/use-utm-v2';
 
@@ -330,7 +326,7 @@ export default function App() {
     localStorage.setItem('userPurchaseIntent', JSON.stringify(purchaseIntent));
     console.log('🎯 Purchase Intent salvo para backup:', purchaseIntent.email);
 
-    // Disparar evento Lead com sistema definitivo (SEM ALTERAÇÕES)
+    // Disparar evento Lead com sistema definitivo
     await fireLeadDefinitivo({
       content_name: 'Lead - Formulário Preenchido',
       content_category: 'Formulário',
@@ -357,34 +353,7 @@ export default function App() {
       }
     });
 
-    // 🚀 NOVO: Preparar Purchase Event (APENAS preparação - sem disparar)
-    console.log('🎯 [PREPARAÇÃO] Preparando Purchase Event a partir do Lead...');
-    console.log('🛡️ [PREPARAÇÃO] GARANTIA: Evento Lead NÃO foi alterado');
-    
-    const preparedPurchaseEvent = createPreparedPurchaseEvent('lead', {
-      trigger_type: 'form_submit',
-      user_engagement_time: Math.floor((Date.now() - startTime) / 1000),
-      form_completion_time: 30,
-      checkout_type: 'modal_redirect'
-    });
-    
-    storePreparedPurchaseEvent(preparedPurchaseEvent);
-    
-    // 🔄 Armazenar dados fallback (segurança adicional)
-    storeFallbackUserData({
-      email: formData.email,
-      phone: phoneClean,
-      fullName: cleanFullName,
-      city: formData.city?.trim(),
-      state: formData.state?.trim(),
-      cep: formData.cep?.replace(/\D/g, ''),
-      timestamp: Date.now()
-    });
-    
-    console.log('✅ [PREPARAÇÃO] Purchase Event preparado e armazenado (sem disparar)');
-    console.log('🛡️ [PREPARAÇÃO] Evento Lead original 100% preservado');
-
-    // Disparar evento InitiateCheckout com sistema definitivo (SEM ALTERAÇÕES)
+    // Disparar evento InitiateCheckout com sistema definitivo
     await fireInitiateCheckoutDefinitivo({
       value: dynamicPrice, // VALOR DINÂMICO
       currency: 'BRL',
@@ -415,27 +384,6 @@ export default function App() {
         checkout_type: 'modal_redirect'
       }
     });
-
-    // 🚀 NOVO: Preparar Purchase Event backup (APENAS preparação - sem disparar)
-    console.log('🎯 [PREPARAÇÃO] Preparando Purchase Event backup a partir do InitiateCheckout...');
-    console.log('🛡️ [PREPARAÇÃO] GARANTIA: Evento InitiateCheckout NÃO foi alterado');
-    
-    const preparedPurchaseEventFromCheckout = createPreparedPurchaseEvent('initiate_checkout', {
-      trigger_type: 'button_click',
-      user_engagement_time: Math.floor((Date.now() - startTime) / 1000),
-      form_completion_time: 30,
-      checkout_type: 'modal_redirect',
-      device_type: 'desktop',
-      browser: 'chrome',
-      operating_system: 'linux',
-      language: 'pt-BR',
-      timezone: 'America/Sao_Paulo',
-      connection_type: '4g'
-    });
-    
-    storePreparedPurchaseEvent(preparedPurchaseEventFromCheckout);
-    console.log('✅ [PREPARAÇÃO] Purchase Event backup preparado e armazenado (sem disparar)');
-    console.log('🛡️ [PREPARAÇÃO] Evento InitiateCheckout original 100% preservado');
 
     // Construir URL final SEGURA (apenas IDs e dados comerciais)
     // LINK ATUALIZADO: https://pay.cakto.com.br/hacr962_605077 (migrado para Cakto)
@@ -498,16 +446,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      
-      {/* 🚀 Prepared Data Sender - Envia dados do localStorage para server-side */}
-      <PreparedDataSender />
-      
-      {/* 🚀 FBP/FBC Tracker Injector */}
-      <Script 
-        src="/fbp-injector.js" 
-        strategy="afterInteractive"
-        onLoad={() => console.log('✅ FBP/FBC Injector carregado')}
-      />
       
       {/* Barra de Urgência - Otimizada para Mobile */}
       <div className="bg-red-600 text-white py-2 px-2 sm:px-4 text-center animate-pulse">
@@ -1174,17 +1112,6 @@ export default function App() {
         onClose={() => setIsPreCheckoutModalOpen(false)}
         onSubmit={handlePreCheckoutSubmit}
       />
-      
-      {/* Componentes de Sistema */}
-      <CheckoutURLProcessor />
-      <PreparedDataSender />
-      
-      {/* Testador do Sistema Híbrido - Apenas em desenvolvimento */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-md">
-          <HybridSystemTester />
-        </div>
-      )}
     </div>
   );
 }
