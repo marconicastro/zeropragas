@@ -222,17 +222,19 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
       content_ids: [caktoData.product?.short_id || CAKTO_PRODUCT_ID],
       content_name: productName,
       content_type: 'product',
-      transaction_id: transactionId,
       
-      // Enriquecimento básico (igual outros eventos)
+      // Campos básicos que ficam fora do custom_data
       content_category: 'digital_product',
       condition: 'new',
       availability: 'in stock',
-      predicted_ltv: amount * 4,
-      
-      // Dados específicos do Purchase (webhook)
       payment_method: paymentMethod,
-      num_items: amount > 50 ? 2 : 1
+      num_items: amount > 50 ? 2 : 1,
+      
+      // 🚩 CAMPOS QUE PRECISAM FICAR DENTRO DO CUSTOM_DATA (EXIGÊNCIA META)
+      custom_data: {
+        transaction_id: transactionId,
+        predicted_ltv: amount * 4
+      }
     }],
     
     access_token: META_ACCESS_TOKEN,
@@ -246,7 +248,18 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     data_processing_options_state: 1000
   };
 
-  console.log('📤 PURCHASE EVENT SISTEMA UNIFICADO FRONTEND:', JSON.stringify(purchaseEvent, null, 2));
+  console.log('📤 PURCHASE EVENT ESTRUTURA FINAL:', JSON.stringify(purchaseEvent, null, 2));
+  
+  // 🚀 VALIDAÇÃO CRÍTICA ANTES DE ENVIAR
+  console.log('🔍 VALIDAÇÃO DA ESTRUTURA:');
+  console.log('- event_name:', purchaseEvent.data?.[0]?.event_name);
+  console.log('- user_data existe:', !!purchaseEvent.data?.[0]?.user_data);
+  console.log('- value:', purchaseEvent.data?.[0]?.value);
+  console.log('- currency:', purchaseEvent.data?.[0]?.currency);
+  console.log('- transaction_id:', purchaseEvent.data?.[0]?.transaction_id);
+  console.log('- Tem custom_data incorreto?:', !!purchaseEvent.data?.[0]?.custom_data);
+  console.log('- access_token existe:', !!purchaseEvent.access_token);
+  
   return { eventId, purchaseEvent };
 }
 
@@ -578,9 +591,30 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
 
   console.log(`✅ [${requestId}] Processando purchase_approved...`);
   
-  // Criar e enviar Purchase Event COM SUA ESTRUTURA COMPLETA
-  const { eventId, purchaseEvent } = await createAdvancedPurchaseEvent(data, requestId);
-  const metaResult = await sendToMetaWithRetry(purchaseEvent, 'Purchase');
+  // Criar e enviar Purchase Event COM VALIDAÇÃO DETALHADA
+  console.log(`🔧 [${requestId}] Criando Purchase Event...`);
+  let eventId, purchaseEvent;
+  
+  try {
+    const result = await createAdvancedPurchaseEvent(data, requestId);
+    eventId = result.eventId;
+    purchaseEvent = result.purchaseEvent;
+    console.log(`✅ [${requestId}] Purchase Event criado com sucesso`);
+  } catch (createError) {
+    console.error(`❌ [${requestId}] Erro ao criar Purchase Event:`, createError);
+    throw new Error(`Falha na criação do evento: ${createError.message}`);
+  }
+  
+  console.log(`🚀 [${requestId}] Enviando para Meta...`);
+  let metaResult;
+  
+  try {
+    metaResult = await sendToMetaWithRetry(purchaseEvent, 'Purchase');
+    console.log(`✅ [${requestId}] Enviado para Meta com sucesso`);
+  } catch (sendError) {
+    console.error(`❌ [${requestId}] Erro ao enviar para Meta:`, sendError);
+    throw new Error(`Falha no envio para Meta: ${sendError.message}`);
+  }
   
   console.log(`🎉 [${requestId}] PURCHASE COM SUA ESTRUTURA ENVIADO! Event ID: ${eventId}`);
   
