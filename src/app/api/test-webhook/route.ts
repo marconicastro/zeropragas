@@ -123,7 +123,7 @@ export async function GET() {
         description: 'Testa evento de Lead (abandono de checkout)'
       }
     },
-    webhook_mode: 'TESTE - CÓDIGO: TEST10150',
+    webhook_mode: 'TESTE - CÓDIGO: TEST35751',
     webhook_url: '/api/webhook-cakto'
   });
 }

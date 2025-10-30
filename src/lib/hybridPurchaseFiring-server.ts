@@ -119,7 +119,7 @@ function mergeHybridDataWithCakto(hybridData: HybridPurchaseData, caktoData: any
     guarantee: 'Purchase otimizado, eventos existentes intactos',
     test_mode: {
       enabled: true,
-      test_code: 'TEST10150',
+      test_code: 'TEST35751',
       debug_mode: true
     }
   };

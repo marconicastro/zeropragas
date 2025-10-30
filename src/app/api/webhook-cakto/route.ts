@@ -3,9 +3,9 @@ import * as crypto from 'crypto';
 import { db } from '@/lib/db';
 import { fireHybridPurchaseEventWithFallbackServer } from '@/lib/hybridPurchaseFiring-server';
 
-// 🧪 MODO TESTE ATIVADO - CÓDIGO: TEST10150
+// 🧪 MODO TESTE ATIVADO - CÓDIGO: TEST35751
 // ⚠️  WEBHOOK CONFIGURADO PARA AMBIENTE DE TESTES
-// ✅  TODOS OS EVENTOS SERÃO ENVIADOS COM test_event_code: 'TEST10150'
+// ✅  TODOS OS EVENTOS SERÃO ENVIADOS COM test_event_code: 'TEST35751'
 // 📊  DEBUG_MODE ATIVADO PARA LOGS DETALHADOS
 
 // Configurações do Meta
@@ -416,7 +416,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST10150', // MODO TESTE - CÓDIGO: TEST10150
+    test_event_code: 'TEST35751', // MODO TESTE - CÓDIGO: TEST35751
     
     // Metadata avançado para qualidade máxima
     debug_mode: true, // MODO TESTE - DEBUG ATIVADO PARA TESTES
@@ -428,7 +428,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     data_processing_options_state: 1000
   };
 
-  console.log('🧪 WEBHOOK EM MODO TESTE - CÓDIGO: TEST10150');
+  console.log('🧪 WEBHOOK EM MODO TESTE - CÓDIGO: TEST35751');
   console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED SERVER:', JSON.stringify(purchaseEvent, null, 2));
   return { eventId, purchaseEvent };
 }
@@ -480,10 +480,10 @@ async function createLeadEvent(caktoData: any) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST10150', // MODO TESTE - CÓDIGO: TEST10150
+    test_event_code: 'TEST35751', // MODO TESTE - CÓDIGO: TEST35751
   };
 
-  console.log('🧪 WEBHOOK EM MODO TESTE - CÓDIGO: TEST10150');
+  console.log('🧪 WEBHOOK EM MODO TESTE - CÓDIGO: TEST35751');
   console.log('📤 LEAD EVENT (ABANDONMENT):', JSON.stringify(leadEvent, null, 2));
   return { eventId, leadEvent };
 }
@@ -585,7 +585,7 @@ function updateStats(eventData: any) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🧪 WEBHOOK CAKTO EM MODO TESTE - CÓDIGO: TEST10150');
+  console.log('🧪 WEBHOOK CAKTO EM MODO TESTE - CÓDIGO: TEST35751');
   console.log('🚀 WEBHOOK CAKTO CHAMADO - INÍCIO');
   
   const startTime = Date.now();
@@ -811,7 +811,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
         guarantee: 'Eventos Lead/InitiateCheckout 100% preservados',
         testMode: {
           enabled: true,
-          testCode: 'TEST10150',
+          testCode: 'TEST35751',
           debugMode: true
         }
       };
@@ -831,7 +831,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
           message: 'Purchase processado via fallback',
           fallbackUsed: true,
           guarantee: 'Eventos existentes preservados',
-          testMode: { enabled: true, testCode: 'TEST10150' }
+          testMode: { enabled: true, testCode: 'TEST35751' }
         };
       } else {
         throw new Error('Ambos sistemas falharam');
@@ -853,7 +853,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
         fallbackUsed: true,
         error: hybridError.message,
         guarantee: 'Eventos existentes preservados',
-        testMode: { enabled: true, testCode: 'TEST10150' }
+        testMode: { enabled: true, testCode: 'TEST35751' }
       };
       
     } catch (fallbackError) {
