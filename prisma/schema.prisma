@@ -90,6 +90,10 @@ model CaktoEvent {
   usedZipcode     String?
   usedCountry     String?
   
+  // Dados do navegador (FBP/FBC)
+  browserDataId   String?
+  browserData     BrowserData? @relation(fields: [browserDataId], references: [id])
+  
   // Controle de processamento
   leadDataId      String?
   lead            LeadUserData? @relation(fields: [leadDataId], references: [id])
@@ -99,4 +103,23 @@ model CaktoEvent {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// Tabela para dados do navegador (FBP/FBC)
+model BrowserData {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  fbp           String?  // Facebook Browser ID
+  fbc           String?  // Facebook Click ID
+  userAgent     String?
+  url           String?
+  referrer      String?
+  ipAddress     String?
+  
+  // Relacionamento com eventos
+  caktoEvents   CaktoEvent[]
+  
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
