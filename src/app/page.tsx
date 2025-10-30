@@ -12,6 +12,7 @@ import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { createPreparedPurchaseEvent, storePreparedPurchaseEvent, storeFallbackUserData } from '@/lib/purchaseEventPreparation';
 
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
+import PreparedDataSender from '@/components/PreparedDataSender';
 import { useUTMs } from '@/hooks/use-utm';
 import { useUTMsV2 } from '@/hooks/use-utm-v2';
 
@@ -495,6 +496,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
+      
+      {/* 🚀 Prepared Data Sender - Envia dados do localStorage para server-side */}
+      <PreparedDataSender />
       
       {/* 🚀 FBP/FBC Tracker Injector */}
       <script 
