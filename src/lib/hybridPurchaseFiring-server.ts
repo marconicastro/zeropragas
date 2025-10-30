@@ -10,21 +10,17 @@ import {
 } from './purchaseEventPreparation-server';
 import { formatUserDataForMetaServer } from './userDataPersistence-server';
 
-// 📦 Função para recuperar dados preparados do client-side
+// 📦 Função para recuperar dados preparados do cache server-side
 async function getPreparedDataFromClient(): Promise<{preparedEvent: any, fallbackData: any}> {
   try {
-    console.log('🔍 [CLIENT-DATA] Recuperando dados preparados do client-side...');
+    console.log('🔍 [CLIENT-DATA] Recuperando dados preparados do cache server-side...');
     
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-prepared-data`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    // Acessar cache server-side diretamente (sem requisição HTTP)
+    const { getServerPreparedData } = await import('./serverPreparedDataCache');
+    const data = getServerPreparedData();
     
-    if (response.ok) {
-      const data = await response.json();
-      console.log('✅ [CLIENT-DATA] Dados recuperados com sucesso:', {
+    if (data && (data.preparedEvent || data.fallbackData)) {
+      console.log('✅ [CLIENT-DATA] Dados recuperados do cache com sucesso:', {
         has_prepared_event: !!data.preparedEvent,
         prepared_event_id: data.preparedEvent?.id,
         has_fallback_data: !!data.fallbackData,
@@ -36,12 +32,12 @@ async function getPreparedDataFromClient(): Promise<{preparedEvent: any, fallbac
         fallbackData: data.fallbackData
       };
     } else {
-      console.log('⚠️ [CLIENT-DATA] Nenhum dado preparado encontrado no client-side');
+      console.log('⚠️ [CLIENT-DATA] Nenhum dado preparado encontrado no cache server-side');
       return { preparedEvent: null, fallbackData: null };
     }
     
   } catch (error) {
-    console.error('❌ [CLIENT-DATA] Erro ao recuperar dados do client-side:', error);
+    console.error('❌ [CLIENT-DATA] Erro ao recuperar dados do cache server-side:', error);
     return { preparedEvent: null, fallbackData: null };
   }
 }

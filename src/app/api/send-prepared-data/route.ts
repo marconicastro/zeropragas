@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// 📦 Armazenamento server-side para dados preparados
-let serverPreparedData: any = null;
-let serverFallbackData: any = null;
+import { setServerPreparedData, getServerPreparedData, getCacheInfo } from '@/lib/serverPreparedDataCache';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,14 +13,14 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now()
     });
     
-    // Armazenar dados no server-side
-    serverPreparedData = preparedEvent;
-    serverFallbackData = fallbackData;
+    // Armazenar dados no cache server-side
+    setServerPreparedData(preparedEvent, fallbackData, source || 'client_side');
     
     return NextResponse.json({
       success: true,
-      message: 'Dados preparados armazenados no server-side',
-      stored_at: Date.now()
+      message: 'Dados preparados armazenados no cache server-side',
+      stored_at: Date.now(),
+      cache_info: getCacheInfo()
     });
     
   } catch (error) {
@@ -38,13 +35,17 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    console.log('🔍 [SEND-PREPARED] Recuperando dados preparados do server-side...');
+    console.log('🔍 [SEND-PREPARED] Recuperando dados preparados do cache server-side...');
+    
+    const data = getServerPreparedData();
+    const cacheInfo = getCacheInfo();
     
     return NextResponse.json({
       success: true,
-      preparedEvent: serverPreparedData,
-      fallbackData: serverFallbackData,
-      timestamp: Date.now()
+      preparedEvent: data?.preparedEvent || null,
+      fallbackData: data?.fallbackData || null,
+      timestamp: data?.timestamp || null,
+      cache_info: cacheInfo
     });
     
   } catch (error) {

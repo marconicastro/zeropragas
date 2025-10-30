@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Script from 'next/script';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
@@ -13,6 +14,7 @@ import { createPreparedPurchaseEvent, storePreparedPurchaseEvent, storeFallbackU
 
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
 import PreparedDataSender from '@/components/PreparedDataSender';
+import HybridSystemTester from '@/components/HybridSystemTester';
 import { useUTMs } from '@/hooks/use-utm';
 import { useUTMsV2 } from '@/hooks/use-utm-v2';
 
@@ -501,7 +503,7 @@ export default function App() {
       <PreparedDataSender />
       
       {/* 🚀 FBP/FBC Tracker Injector */}
-      <script 
+      <Script 
         src="/fbp-injector.js" 
         strategy="afterInteractive"
         onLoad={() => console.log('✅ FBP/FBC Injector carregado')}
@@ -1172,6 +1174,17 @@ export default function App() {
         onClose={() => setIsPreCheckoutModalOpen(false)}
         onSubmit={handlePreCheckoutSubmit}
       />
+      
+      {/* Componentes de Sistema */}
+      <CheckoutURLProcessor />
+      <PreparedDataSender />
+      
+      {/* Testador do Sistema Híbrido - Apenas em desenvolvimento */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-md">
+          <HybridSystemTester />
+        </div>
+      )}
     </div>
   );
 }
