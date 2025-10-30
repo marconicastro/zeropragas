@@ -203,7 +203,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     total_fields: Object.values(unifiedUserData).filter(v => v && v !== null).length
   });
 
-  // Purchase Event para Meta - MESMO PADRÃO DOS OUTROS EVENTOS
+  // Purchase Event para Meta - ESTRUTURA CORRETA CONVERSIONS API
   const purchaseEvent = {
     data: [{
       // 🚀 ESTRUTURA SIMPLES IGUAL PAGEVIEW, LEAD, ETC.
@@ -216,7 +216,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
       // 🚀 SISTEMA UNIFICADO (EXATAMENTE IGUAL OUTROS EVENTOS)
       user_data: unifiedUserData,
       
-      // 🚀 PARÂMETROS SIMPLES (PADRÃO FRONTEND) + dados do webhook
+      // 🚀 PARÂMETROS BÁSICOS FORA DO CUSTOM_DATA
       value: amount,
       currency: 'BRL',
       content_ids: [caktoData.product?.short_id || CAKTO_PRODUCT_ID],
@@ -232,13 +232,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
       
       // Dados específicos do Purchase (webhook)
       payment_method: paymentMethod,
-      num_items: amount > 50 ? 2 : 1,
-      
-      // Metadados simples
-      event_source: 'cakto_webhook',
-      processing_time_ms: Date.now() - timestamp * 1000,
-      webhook_id: requestId,
-      user_data_system: 'getStandardizedUserData_like_frontend'
+      num_items: amount > 50 ? 2 : 1
     }],
     
     access_token: META_ACCESS_TOKEN,
