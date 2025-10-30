@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
-import { fireHybridPurchaseEvent } from '@/lib/hybridPurchaseFiring';
+import { fireHybridPurchaseEventWithFallbackServer } from '@/lib/hybridPurchaseFiring-server';
 
 // 🧪 MODO TESTE ATIVADO - CÓDIGO: TEST10150
 // ⚠️  WEBHOOK CONFIGURADO PARA AMBIENTE DE TESTES
@@ -769,7 +769,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
   
   try {
     // Disparar Purchase Event Híbrido
-    const hybridSuccess = await fireHybridPurchaseEvent(data);
+    const hybridSuccess = await fireHybridPurchaseEventWithFallbackServer(data);
     
     if (hybridSuccess) {
       console.log('✅ [HÍBRIDO] Purchase Event Híbrido disparado com sucesso!');
@@ -822,7 +822,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
       // Fallback: tentar sistema antigo
       console.log('🔄 [FALLBACK] Tentando sistema antigo como backup...');
       const fallbackResult = await createAdvancedPurchaseEvent(data, requestId);
-      const fallbackSuccess = await sendEventToMeta(fallbackResult);
+      const fallbackSuccess = await sendToMetaWithRetry(fallbackResult, 'Purchase');
       
       if (fallbackSuccess) {
         console.log('✅ [FALLBACK] Sistema antigo funcionou como backup');
@@ -845,7 +845,7 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
     try {
       console.log('🔄 [FALLBACK] Executando fallback total...');
       const fallbackResult = await createAdvancedPurchaseEvent(data, requestId);
-      await sendEventToMeta(fallbackResult);
+      await sendToMetaWithRetry(fallbackResult, 'Purchase');
       
       return {
         success: true,
