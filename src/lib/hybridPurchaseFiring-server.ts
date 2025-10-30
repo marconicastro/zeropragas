@@ -146,10 +146,11 @@ async function firePurchaseEventServer(eventData: any): Promise<boolean> {
         event_source_url: eventData.event_source_url || 'https://www.maracujazeropragas.com/',
         action_source: eventData.action_source || 'website',
         user_data: eventData.user_data,
-        custom_data: eventData.custom_data,
-        test_event_code: eventData.test_mode?.enabled ? 'TEST35751' : null
+        custom_data: eventData.custom_data
+        // REMOVIDO: test_event_code deve ficar no nível principal
       }],
       access_token: META_ACCESS_TOKEN,
+      test_event_code: eventData.test_mode?.enabled ? 'TEST35751' : null, // MOVIDO para nível principal
       debug_mode: eventData.test_mode?.enabled || false,
       partner_agent: 'hybrid_system_v3.2-server',
       namespace: 'maracujazeropragas',
@@ -252,34 +253,73 @@ export async function fireHybridPurchaseEventWithFallbackServer(caktoData: any):
   }
 }
 
-// 📤 6. Purchase Event mínimo (fallback)
+// 📤 6. Purchase Event mínimo (fallback) - ENVIO REAL
 async function fireMinimalPurchaseEventServer(caktoData: any): Promise<boolean> {
   try {
     const timestamp = Date.now();
     const eventId = `MinimalPurchase_${timestamp}_${Math.random().toString(36).substr(2, 6)}`;
     
-    const minimalEvent = {
-      event_id: eventId,
-      event_name: 'Purchase',
-      event_time: Math.floor(timestamp / 1000),
-      user_data: {
-        external_id: `minimal_${timestamp}`
-      },
-      custom_data: {
-        currency: 'BRL',
-        value: caktoData.amount || 39.9,
-        content_ids: [caktoData.product?.short_id || 'hacr962']
-      },
-      test_mode: true
+    // 🚀 ENVIO REAL para Meta Conversions API
+    const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
+    const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAUsqHMv8GcBP5dQ8HjQcx4ZCEtCq958ZBKe71qP5ZAUZAtZAGfAN4OzsKZCAsCE3ZATp8cuTn5bWgWI2m35H31nnPKg8CMX3cqWa709DWSPdBXD2vF6P8RMXMZAnRNZCXcwX0nL0sBYbN821XurMRwrHZAM1X5qX7AjljZBabX8XArHoy4MZBZCl06lKHYHyuzBs2AZDZD';
+    
+    // Payload mínimo para Meta
+    const minimalPayload = {
+      data: [{
+        event_name: 'Purchase',
+        event_time: Math.floor(timestamp / 1000),
+        event_id: eventId,
+        event_source_url: 'https://www.maracujazeropragas.com/',
+        action_source: 'website',
+        user_data: {
+          external_id: `minimal_${timestamp}`
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: caktoData.amount || 39.9,
+          content_ids: [caktoData.product?.short_id || 'hacr962']
+        }
+      }],
+      access_token: META_ACCESS_TOKEN,
+      test_event_code: 'TEST35751', // Test code no nível principal
+      debug_mode: true,
+      partner_agent: 'hybrid_system_v3.2-minimal',
+      namespace: 'maracujazeropragas',
+      upload_tag: 'minimal_purchase_server',
+      data_processing_options: ['LDU'],
+      data_processing_options_country: 1,
+      data_processing_options_state: 1000
     };
     
-    console.log('📤 [MINIMAL-SERVER] Disparando Purchase mínimo...');
+    console.log('📤 [MINIMAL-SERVER] Enviando Purchase mínimo para Meta...');
+    console.log('📤 [MINIMAL-SERVER] Payload:', JSON.stringify(minimalPayload, null, 2));
     
-    // Simular envio
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // Enviar para Meta API
+    const metaUrl = `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`;
+    const response = await fetch(metaUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Hybrid-System-Minimal/3.2'
+      },
+      body: JSON.stringify(minimalPayload)
+    });
     
-    console.log('✅ [MINIMAL-SERVER] Purchase mínimo disparado');
-    return true;
+    const result = await response.json();
+    
+    console.log('📥 [MINIMAL-SERVER] Resposta da Meta:', {
+      status: response.status,
+      success: response.ok,
+      result: result
+    });
+    
+    if (response.ok && !result.error) {
+      console.log('✅ [MINIMAL-SERVER] Purchase mínimo enviado com sucesso para Meta');
+      return true;
+    } else {
+      console.error('❌ [MINIMAL-SERVER] Erro na resposta da Meta:', result);
+      return false;
+    }
     
   } catch (error) {
     console.error('❌ [MINIMAL-SERVER] Erro no Purchase mínimo:', error);
