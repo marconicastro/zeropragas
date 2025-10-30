@@ -223,17 +223,15 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
       content_name: productName,
       content_type: 'product',
       
-      // Campos básicos que ficam fora do custom_data
-      content_category: 'digital_product',
-      condition: 'new',
-      availability: 'in stock',
-      payment_method: paymentMethod,
-      num_items: amount > 50 ? 2 : 1,
-      
       // 🚩 CAMPOS QUE PRECISAM FICAR DENTRO DO CUSTOM_DATA (EXIGÊNCIA META)
       custom_data: {
         transaction_id: transactionId,
-        predicted_ltv: amount * 4
+        predicted_ltv: amount * 4,
+        content_category: 'digital_product',
+        condition: 'new',
+        availability: 'in stock',
+        payment_method: paymentMethod,
+        num_items: amount > 50 ? 2 : 1
       }
     }],
     
@@ -250,6 +248,29 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
 
   console.log('📤 PURCHASE EVENT ESTRUTURA FINAL:', JSON.stringify(purchaseEvent, null, 2));
   
+  // 🚨 SEGURANÇA ADICIONAL - REMOVER CAMPOS DO NÍVEL SUPERIOR (BUG FIX)
+  if (purchaseEvent.data && purchaseEvent.data[0]) {
+    const eventData = purchaseEvent.data[0];
+    
+    // Remover campos do nível superior que deveriam estar apenas no custom_data
+    const fieldsToRemove = [
+      'content_category',
+      'condition', 
+      'availability',
+      'payment_method',
+      'num_items'
+    ];
+    
+    fieldsToRemove.forEach(field => {
+      if (eventData.hasOwnProperty(field)) {
+        console.log(`🚨 REMOVENDO CAMPO DUPLICADO DO NÍVEL SUPERIOR: ${field}`);
+        delete eventData[field];
+      }
+    });
+    
+    console.log('📤 ESTRUTURA CORRIGIDA:', JSON.stringify(purchaseEvent, null, 2));
+  }
+  
   // 🚀 VALIDAÇÃO CRÍTICA ANTES DE ENVIAR
   console.log('🔍 VALIDAÇÃO DA ESTRUTURA:');
   console.log('- event_name:', purchaseEvent.data?.[0]?.event_name);
@@ -259,6 +280,17 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
   console.log('- transaction_id:', purchaseEvent.data?.[0]?.transaction_id);
   console.log('- Tem custom_data incorreto?:', !!purchaseEvent.data?.[0]?.custom_data);
   console.log('- access_token existe:', !!purchaseEvent.access_token);
+  
+  // 🚨 VALIDAÇÃO ADICIONAL - GARANTIR QUE CAMPOS PROBLEMÁTICOS NÃO EXISTAM NO NÍVEL SUPERIOR
+  const problematicFields = ['content_category', 'condition', 'availability', 'payment_method', 'num_items'];
+  const foundProblematicFields = problematicFields.filter(field => purchaseEvent.data?.[0]?.hasOwnProperty(field));
+  
+  if (foundProblematicFields.length > 0) {
+    console.error('❌ ERRO CRÍTICO: Campos problemáticos encontrados no nível superior:', foundProblematicFields);
+    throw new Error(`Campos proibidos no nível superior: ${foundProblematicFields.join(', ')}`);
+  }
+  
+  console.log('✅ Estrutura validada - sem campos proibidos no nível superior');
   
   return { eventId, purchaseEvent };
 }
