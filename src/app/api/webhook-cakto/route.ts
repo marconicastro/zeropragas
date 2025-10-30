@@ -862,26 +862,6 @@ async function handlePurchaseApproved(data: any, requestId: string, startTime: n
     }
   }
 }
-  
-  return {
-    event_type: 'purchase_approved',
-    meta_event_id: eventId,
-    meta_response: metaResult,
-    validation_data: {
-      data_source: 'database_lead_or_api_geolocation',
-      structure: 'complete_like_other_events',
-      used_email: data.customer?.email ? '***' + data.customer.email.split('@')[1] : 'missing',
-      used_phone: data.customer?.phone ? '***' + data.customer.phone.slice(-4) : 'missing',
-      used_city: 'from_database_or_api',
-      used_state: 'from_database_or_api'
-    },
-    transaction_data: {
-      id: data.id,
-      amount: data.amount,
-      payment_method: data.paymentMethod
-    }
-  };
-}
 
 // Handler para checkout_abandonment
 async function handleCheckoutAbandonment(data: any, requestId: string, startTime: number) {
