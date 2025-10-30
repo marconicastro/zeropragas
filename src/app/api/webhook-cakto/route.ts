@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
+import { getStandardizedUserData } from '@/lib/unifiedUserData';
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
@@ -71,7 +72,7 @@ function cleanPhone(phone?: string): string | null {
   return phone.replace(/\D/g, '').replace(/^55/, '').slice(-11);
 }
 
-// Função para criar Purchase Event para Meta com SUA ESTRUTURA COMPLETA
+// Função para criar Purchase Event para Meta com SISTEMA UNIFICADO
 async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
   const eventId = `Purchase_${timestamp}_${Math.random().toString(36).substr(2, 8)}`;
@@ -91,10 +92,10 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
   const customerState = caktoData.customer?.address?.state || '';
   const customerZipcode = caktoData.customer?.address?.zipcode || '';
   
-  // 🚀 USAR SUA ESTRUTURA user_data COMPLETA (IGUAL LEAD E CHECKOUT)
-  console.log('🔄 Obtendo user_data COMPLETO igual aos outros eventos...');
+  // 🚀 USAR SISTEMA UNIFICADO EXATAMENTE COMO FRONTEND
+  console.log('🔄 Usando SISTEMA UNIFICADO getStandardizedUserData()...');
   
-  // Buscar dados do usuário no banco de dados (mesma lógica do seu sistema)
+  // Buscar dados do usuário no banco para enriquecimento
   let userDataFromDB = null;
   if (customerEmail || customerPhone) {
     try {
@@ -112,94 +113,86 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
       }
       
       if (userDataFromDB) {
-        console.log('✅ Dados encontrados no banco - usando sua estrutura COMPLETA');
+        console.log('✅ Dados encontrados no banco - enriquecendo sistema unificado');
       }
     } catch (error) {
       console.log('⚠️ Banco não disponível, usando API de geolocalização');
     }
   }
   
-  // Se não encontrou no banco, usar API de geolocalização (mesmo sistema do seu site)
-  if (!userDataFromDB) {
+  // Preparar dados para o sistema unificado (simular ambiente frontend)
+  const enrichedData = {
+    email: customerEmail || userDataFromDB?.email || '',
+    phone: customerPhone || userDataFromDB?.phone || '',
+    fullName: customerName || userDataFromDB?.fullName || '',
+    city: customerCity || userDataFromDB?.city || '',
+    state: customerState || userDataFromDB?.state || '',
+    cep: customerZipcode || userDataFromDB?.cep || '',
+    country: 'br'
+  };
+  
+  // Salvar temporariamente para o sistema unificado usar
+  if (typeof window === 'undefined') {
+    // Server-side: salvar temporariamente no banco para o sistema unificado encontrar
     try {
-      const locationResponse = await fetch('http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query');
-      if (locationResponse.ok) {
-        const locationData = await locationResponse.json();
-        if (locationData.status === 'success') {
-          userDataFromDB = {
-            email: customerEmail || '',
-            phone: customerPhone || '',
-            fullName: customerName || '',
-            city: locationData.city || 'sao paulo',
-            state: locationData.regionName?.toLowerCase() || 'sao paulo',
-            zipcode: locationData.zip || '01310',
-            country: 'br'
-          };
-          console.log('✅ Geolocalização obtida via API:', locationData.city);
-        }
+      if (enrichedData.email && !userDataFromDB) {
+        await db.leadUserData.upsert({
+          where: { email: enrichedData.email },
+          update: enrichedData,
+          create: enrichedData
+        });
       }
     } catch (error) {
-      console.log('⚠️ API de geolocalização falhou, usando defaults');
-      userDataFromDB = {
-        email: customerEmail || '',
-        phone: customerPhone || '',
-        fullName: customerName || '',
-        city: 'sao paulo',
-        state: 'sao paulo', 
-        zipcode: '01310',
-        country: 'br'
-      };
+      console.log('⚠️ Não foi possível salvar dados temporários');
     }
   }
   
-  // Formatar EXATAMENTE como sua estrutura formatUserDataForMeta
-  const phoneClean = userDataFromDB.phone?.replace(/\D/g, '') || '';
-  let phoneWithCountry = phoneClean;
-  
-  if (phoneClean.length === 10) {
-    phoneWithCountry = `55${phoneClean}`;
-  } else if (phoneClean.length === 11) {
-    phoneWithCountry = `55${phoneClean}`;
+  // 🎯 OBTER DADOS UNIFICADOS (MESMA LÓGICA DO FRONTEND)
+  let unifiedUserData;
+  try {
+    unifiedUserData = await getStandardizedUserData();
+    console.log('✅ Sistema unificado executado com sucesso');
+  } catch (error) {
+    console.log('❌ Sistema unificado falhou, usando fallback manual');
+    
+    // Fallback manual com dados disponíveis
+    const phoneClean = enrichedData.phone?.replace(/\D/g, '') || '';
+    let phoneWithCountry = phoneClean;
+    
+    if (phoneClean.length === 10) {
+      phoneWithCountry = `55${phoneClean}`;
+    } else if (phoneClean.length === 11) {
+      phoneWithCountry = `55${phoneClean}`;
+    }
+    
+    const nameParts = enrichedData.fullName?.toLowerCase().trim().split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    
+    const zipCode = enrichedData.cep?.replace(/\D/g, '') || '';
+    
+    unifiedUserData = {
+      em: enrichedData.email ? sha256(enrichedData.email.toLowerCase().trim()) : null,
+      ph: phoneWithCountry ? sha256(phoneWithCountry) : null,
+      fn: firstName ? sha256(firstName) : null,
+      ln: lastName ? sha256(lastName) : null,
+      ct: enrichedData.city ? sha256(enrichedData.city.toLowerCase().trim()) : null,
+      st: enrichedData.state ? sha256(enrichedData.state.toLowerCase().trim()) : null,
+      zp: zipCode ? sha256(zipCode) : null,
+      country: sha256('br'),
+      external_id: transactionId || `cakto_${Date.now()}`,
+      client_ip_address: null,
+      client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server'
+    };
   }
   
-  const nameParts = userDataFromDB.fullName?.toLowerCase().trim().split(' ') || [];
-  const firstName = nameParts[0] || '';
-  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-  
-  const zipCode = userDataFromDB.zipcode?.replace(/\D/g, '') || '';
-  
-  // Criar user_data EXATAMENTE como sua estrutura
-  const unifiedUserData = {
-    em: userDataFromDB.email ? sha256(userDataFromDB.email.toLowerCase().trim()) : null,
-    ph: phoneWithCountry ? sha256(phoneWithCountry) : null,
-    fn: firstName ? sha256(firstName) : null,
-    ln: lastName ? sha256(lastName) : null,
-    ct: userDataFromDB.city ? sha256(userDataFromDB.city.toLowerCase().trim()) : null,
-    st: userDataFromDB.state ? sha256(userDataFromDB.state.toLowerCase().trim()) : null,
-    zp: zipCode ? sha256(zipCode) : null,
-    country: sha256('br'),
-    external_id: transactionId || `cakto_${Date.now()}`,
-    client_ip_address: null, // CORRETO: null no backend
-    client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server'
-  };
-  
-  console.log('✅ User_data COMPLETO gerado (sua estrutura):', {
-    has_email: !!unifiedUserData.em,
-    has_phone: !!unifiedUserData.ph,
-    has_name: !!unifiedUserData.fn,
-    has_location: !!unifiedUserData.ct,
-    city_original: userDataFromDB.city,
-    state_original: userDataFromDB.state,
-    source: userDataFromDB.email ? 'database_lead' : 'api_geolocation'
-  });
-
-  console.log('🎯 DADOS COMPLETOS - PURCHASE:', {
+  console.log('🎯 DADOS UNIFICADOS - PURCHASE:', {
     transaction_id: transactionId,
     amount,
     product_name: productName,
     payment_method: paymentMethod,
-    data_source: userDataFromDB.email ? 'database_lead' : 'api_geolocation',
-    user_data_system: 'complete_structure_like_other_events',
+    data_source: userDataFromDB ? 'database_enriched' : 'webhook_only',
+    user_data_system: 'getStandardizedUserData_like_frontend',
     customer_email: customerEmail ? '***' + customerEmail.split('@')[1] : 'missing',
     customer_phone: customerPhone ? '***' + customerPhone.slice(-4) : 'missing',
     customer_name: customerName ? customerName.split(' ')[0] : 'missing',
@@ -207,183 +200,59 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     has_phone: !!unifiedUserData.ph,
     has_name: !!unifiedUserData.fn,
     has_location: !!unifiedUserData.ct,
-    city_real: userDataFromDB.city,
-    state_real: userDataFromDB.state
+    total_fields: Object.values(unifiedUserData).filter(v => v && v !== null).length
   });
 
-  // Log dos hashes SHA256 da sua estrutura
-  console.log('🔐 HASHES SUA ESTRUTURA SHA256:', {
-    email_hash: unifiedUserData.em || 'empty',
-    phone_hash: unifiedUserData.ph || 'empty',
-    first_name_hash: unifiedUserData.fn || 'empty',
-    last_name_hash: unifiedUserData.ln || 'empty',
-    city_hash: unifiedUserData.ct || 'empty',
-    state_hash: unifiedUserData.st || 'empty',
-    zip_hash: unifiedUserData.zp || 'empty',
-    country_hash: unifiedUserData.country || 'empty',
-    external_id: unifiedUserData.external_id || 'empty'
-  });
-
-  // Purchase Event para Meta com SUA ESTRUTURA COMPLETA + parâmetros Cakto
+  // Purchase Event para Meta - MESMO PADRÃO DOS OUTROS EVENTOS
   const purchaseEvent = {
     data: [{
+      // 🚀 ESTRUTURA SIMPLES IGUAL PAGEVIEW, LEAD, ETC.
       event_name: 'Purchase',
       event_id: eventId,
       event_time: timestamp,
       action_source: 'website',
       event_source_url: 'https://maracujazeropragas.com/',
       
-      // 🚀 SUA ESTRUTURA COMPLETA (IGUAL LEAD E CHECKOUT)
+      // 🚀 SISTEMA UNIFICADO (EXATAMENTE IGUAL OUTROS EVENTOS)
       user_data: unifiedUserData,
       
-      // Custom Data AVANÇADO - 50+ PARÂMETROS
-      custom_data: {
-        // Básicos obrigatórios
-        currency: 'BRL',
-        value: amount,
-        content_ids: [caktoData.product?.short_id || CAKTO_PRODUCT_ID],
-        content_name: productName,
-        content_type: 'product',
-        transaction_id: transactionId,
-        
-        // Avançados para nota 9.3+
-        content_category: 'digital_product',
-        content_category2: 'agricultura',
-        content_category3: 'pragas',
-        content_category4: 'sistema_4_fases',
-        content_category5: 'maracuja',
-        
-        // Detalhes do produto
-        brand: 'Maracujá Zero Pragas',
-        description: 'Sistema completo para eliminação de trips no maracujazeiro',
-        availability: 'in stock',
-        condition: 'new',
-        quantity: 1,
-        
-        // Preço e promoções (100% DINÂMICO)
-        price: amount,
-        compare_at_price: amount * 4, // Calculado dinamicamente (4x o valor)
-        discount_percentage: Math.round((1 - (amount / (amount * 4))) * 100), // Calculado dinamicamente
-        coupon: '',
-        
-        // Order Bump e upsells detectados automaticamente
-        order_bump_detected: amount > 50, // Detecta automaticamente Order Bumps
-        base_product_value: amount > 50 ? 39.90 : amount, // Valor base do produto
-        bump_value: amount > 50 ? amount - 39.90 : 0, // Valor adicional do bump
-        total_items: amount > 50 ? 2 : 1, // Quantidade de itens detectada
-        
-        // Métodos de entrega
-        delivery_category: 'home_delivery', // Valor aceito pela Meta
-        shipping_tier: 'next_day',
-        estimated_delivery_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        
-        // Métodos de pagamento
-        payment_method: paymentMethod,
-        payment_method_type: paymentMethod === 'pix' ? 'instant_transfer' : 'credit_card',
-        
-        // Detalhes da oferta
-        offer_id: offerId,
-        product_short_id: caktoData.product?.short_id || CAKTO_PRODUCT_ID,
-        variant: paymentMethod === 'pix' ? 'pix_discount' : 'full_price',
-        
-        // Dados do cliente para segmentação (DINÂMICO)
-        customer_type: 'web',
-        customer_segment: amount > 100 ? 'premium_plus' : amount > 50 ? 'premium' : 'standard',
-        customer_lifetime_value: amount * 12, // LTV estimado dinâmico
-        
-        // Dados de campanha
-        utm_source: 'organic',
-        utm_medium: 'web',
-        utm_campaign: 'sistema_4_fases_v2',
-        utm_content: 'checkout_complete',
-        utm_term: 'compra_concluida',
-        
-        // Metadados do evento
-        event_source: 'cakto_webhook',
-        event_version: '3.1-enterprise-unified-server', // Atualizado versão
-        processing_time_ms: Date.now() - timestamp * 1000,
-        webhook_id: requestId,
-        data_validation_source: userDataFromDB.email ? 'database_lead' : 'api_geolocation',
-        user_data_system: 'complete_structure_like_other_events', // ATUALIZADO
-        
-        // Dados de qualidade para Meta (100% DINÂMICO)
-        lead_type: 'purchase',
-        predicted_ltv: amount * 15, // LTV previsto alto (calculado dinamicamente)
-        order_type: 'new_customer',
-        first_purchase: true,
-        average_order_value: amount, // AOV dinâmico
-        purchase_frequency: 'single',
-        
-        // Dados técnicos
-        browser_platform: 'web',
-        device_type: 'desktop',
-        user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server',
-        
-        // Dados de conformidade
-        gdpr_consent: true,
-        ccpa_consent: true,
-        data_processing_consent: true,
-        
-        // Dados de análise
-        checkout_step: 'completed',
-        funnel_stage: 'conversion',
-        conversion_value: amount,
-        micro_conversion: false,
-        
-        // Dados de produto específicos
-        crop_type: 'maracuja',
-        pest_type: 'trips',
-        solution_type: 'sistema_4_fases',
-        application_method: 'spray',
-        treatment_area: '1_hectare',
-        
-        // Dados de suporte
-        support_email: 'suporte@maracujazeropragas.com',
-        warranty_days: 30,
-        guarantee_type: 'money_back',
-        
-        // Dados de comunidade
-        community_access: true,
-        tutorial_included: true,
-        video_guide: true,
-        pdf_manual: true,
-        
-        // Dados de bônus (DINÂMICO)
-        bonus_items: amount > 50 ? 5 : 3, // Mais bônus para Order Bumps
-        bonus_value: amount > 50 ? 300 : 200, // Valor de bônus dinâmico
-        total_package_value: amount + (amount > 50 ? 300 : 200), // Valor total dinâmico
-        
-        // Dados de urgência
-        scarcity_factor: 'limited_time',
-        urgency_level: 'medium',
-        deadline_hours: 24,
-        
-        // Dados de prova social
-        social_proof_count: 1247,
-        rating_average: 4.8,
-        review_count: 342,
-        
-        // Dados de otimização
-        test_variant: 'control',
-        ab_test_id: 'cakto_migration_test',
-        optimization_score: 9.8 // Aumentado com dados unificados
-      }
+      // 🚀 PARÂMETROS SIMPLES (PADRÃO FRONTEND) + dados do webhook
+      value: amount,
+      currency: 'BRL',
+      content_ids: [caktoData.product?.short_id || CAKTO_PRODUCT_ID],
+      content_name: productName,
+      content_type: 'product',
+      transaction_id: transactionId,
+      
+      // Enriquecimento básico (igual outros eventos)
+      content_category: 'digital_product',
+      condition: 'new',
+      availability: 'in stock',
+      predicted_ltv: amount * 4,
+      
+      // Dados específicos do Purchase (webhook)
+      payment_method: paymentMethod,
+      num_items: amount > 50 ? 2 : 1,
+      
+      // Metadados simples
+      event_source: 'cakto_webhook',
+      processing_time_ms: Date.now() - timestamp * 1000,
+      webhook_id: requestId,
+      user_data_system: 'getStandardizedUserData_like_frontend'
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: '', // MODO PRODUÇÃO - SEM TESTE
-    
-    // Metadata avançado para qualidade máxima
-    debug_mode: false, // MODO PRODUÇÃO - DEBUG DESATIVADO
-    partner_agent: 'cakto_webhook_v3.1-enterprise-unified-server',
+    test_event_code: 'TEST10150',
+    debug_mode: true,
+    partner_agent: 'cakto_webhook_v3.1-unified-frontend',
     namespace: 'maracujazeropragas',
-    upload_tag: 'cakto_purchase_unified_server',
+    upload_tag: 'cakto_purchase_unified_frontend',
     data_processing_options: ['LDU'],
     data_processing_options_country: 1,
     data_processing_options_state: 1000
   };
 
-  console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED SERVER:', JSON.stringify(purchaseEvent, null, 2));
+  console.log('📤 PURCHASE EVENT SISTEMA UNIFICADO FRONTEND:', JSON.stringify(purchaseEvent, null, 2));
   return { eventId, purchaseEvent };
 }
 
@@ -434,7 +303,7 @@ async function createLeadEvent(caktoData: any) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: '', // MODO PRODUÇÃO - SEM TESTE
+    test_event_code: 'TEST10150', // MODO TESTE ATIVADO COM CÓDIGO PERSONALIZADO
   };
 
   console.log('📤 LEAD EVENT (ABANDONMENT):', JSON.stringify(leadEvent, null, 2));
