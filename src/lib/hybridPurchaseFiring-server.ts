@@ -2,6 +2,7 @@
 // GARANTIA TOTAL: Eventos Lead e InitiateCheckout NÃO serão alterados
 // VERSÃO SERVER-SIDE: Sem dependências de localStorage/window
 
+import * as crypto from 'crypto';
 import { 
   getHybridPurchaseDataServer, 
   markEventAsFiredServer,
@@ -132,42 +133,91 @@ async function firePurchaseEventServer(eventData: any): Promise<boolean> {
   try {
     console.log('📤 [META-SERVER] Enviando Purchase Event para Meta...');
     
-    // 🔄 Simulação de envio para Meta (server-side)
-    // Em produção, aqui seria a chamada real para a API Conversions API
+    // 🚀 ENVIO REAL para Meta Conversions API
+    const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
+    const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAUsqHMv8GcBP5dQ8HjQcx4ZCEtCq958ZBKe71qP5ZAUZAtZAGfAN4OzsKZCAsCE3ZATp8cuTn5bWgWI2m35H31nnPKg8CMX3cqWa709DWSPdBXD2vF6P8RMXMZAnRNZCXcwX0nL0sBYbN821XurMRwrHZAM1X5qX7AjljZBabX8XArHoy4MZBZCl06lKHYHyuzBs2AZDZD';
     
-    // Simular delay de rede
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Construir payload para Meta API
+    const metaPayload = {
+      data: [{
+        event_name: 'Purchase',
+        event_time: eventData.event_time || Math.floor(Date.now() / 1000),
+        event_id: eventData.event_id,
+        event_source_url: eventData.event_source_url || 'https://www.maracujazeropragas.com/',
+        action_source: eventData.action_source || 'website',
+        user_data: eventData.user_data,
+        custom_data: eventData.custom_data,
+        test_event_code: eventData.test_mode?.enabled ? 'TEST35751' : null
+      }],
+      access_token: META_ACCESS_TOKEN,
+      debug_mode: eventData.test_mode?.enabled || false,
+      partner_agent: 'hybrid_system_v3.2-server',
+      namespace: 'maracujazeropragas',
+      upload_tag: 'hybrid_purchase_server',
+      data_processing_options: ['LDU'],
+      data_processing_options_country: 1,
+      data_processing_options_state: 1000
+    };
     
-    // Simular sucesso
-    console.log('✅ [META-SERVER] Purchase Event enviado com sucesso:', {
-      event_id: eventData.event_id,
-      value: eventData.final_value,
-      currency: eventData.custom_data.currency,
-      test_mode: eventData.test_mode.enabled
+    console.log('📤 [META-SERVER] Payload para Meta:', JSON.stringify(metaPayload, null, 2));
+    
+    // Enviar para Meta API
+    const metaUrl = `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const response = await fetch(metaUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Hybrid-System-Server/3.2'
+      },
+      body: JSON.stringify(metaPayload),
+      signal: controller.signal
     });
     
-    return true;
+    clearTimeout(timeoutId);
+    
+    const result = await response.json();
+    
+    console.log('📥 [META-SERVER] Resposta da Meta:', {
+      status: response.status,
+      success: response.ok,
+      result: result
+    });
+    
+    if (response.ok && !result.error) {
+      console.log('✅ [META-SERVER] Purchase Event enviado com sucesso para Meta:', {
+        event_id: eventData.event_id,
+        value: eventData.final_value,
+        currency: eventData.custom_data.currency,
+        test_mode: eventData.test_mode.enabled,
+        fb_response: result
+      });
+      return true;
+    } else {
+      console.error('❌ [META-SERVER] Erro na resposta da Meta:', result);
+      return false;
+    }
     
   } catch (error) {
-    console.error('❌ [META-SERVER] Erro ao enviar Purchase Event:', error);
+    console.error('❌ [META-SERVER] Erro ao enviar Purchase Event para Meta:', error);
     return false;
   }
 }
 
-// 🔐 4. Funções de hash (server-side)
+// 🔐 4. Funções de hash (server-side) - SHA-256 REAL
 function hashEmail(email: string): string {
-  // Simulação de hash SHA-256
-  return `hashed_${email.toLowerCase().replace(/[^a-z0-9]/g, '')}_sha256`;
+  return crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
 }
 
 function hashPhone(phone: string): string {
-  // Simulação de hash SHA-256
-  return `hashed_${phone.replace(/\D/g, '')}_sha256`;
+  const cleanPhone = phone.replace(/\D/g, '');
+  return crypto.createHash('sha256').update(cleanPhone).digest('hex');
 }
 
 function hashName(name: string): string {
-  // Simulação de hash SHA-256
-  return `hashed_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}_sha256`;
+  return crypto.createHash('sha256').update(name.toLowerCase().trim()).digest('hex');
 }
 
 // 🎯 5. Sistema de fallback completo
