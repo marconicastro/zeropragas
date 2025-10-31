@@ -30,6 +30,11 @@ import { getUTMManager } from './utm-manager';
 import { recordTrackingEvent } from './tracking-monitor';
 import { getMetaPixelCookies } from './fbp-fbc-helper';
 
+// 🚀 CONFIGURAÇÃO CAPI GATEWAY
+const CAPI_GATEWAY_URL = process.env.NEXT_PUBLIC_CAPI_GATEWAY_URL || 'https://capig.maracujazeropragas.com/';
+const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || '642933108377475';
+const TEST_EVENT_CODE = process.env.NEXT_PUBLIC_TEST_EVENT_CODE || '';
+
 // 🎛️ CONTROLE DE MODO (Mantido exatamente como estava)
 const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
 
@@ -37,6 +42,75 @@ const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
 declare global {
   interface Window {
     fbq: (command: string, eventName: string, parameters?: any, options?: any) => void;
+  }
+}
+
+/**
+ * 🚀 ENVIO INSTANTÂNEO PARA CAPI GATEWAY
+ * Envia eventos DIRETAMENTE para o CAPI Gateway sem esperar Meta Pixel
+ * Elimina delays e garante envio imediato
+ */
+async function sendToCapiGatewayInstant(
+  eventName: string,
+  params: any,
+  eventId: string
+): Promise<void> {
+  try {
+    const timestamp = Math.floor(Date.now() / 1000);
+    
+    // Preparar payload no formato Meta Conversions API
+    const payload = {
+      data: [{
+        event_name: eventName,
+        event_id: eventId,
+        event_time: timestamp,
+        action_source: 'website',
+        event_source_url: params.event_source_url || (typeof window !== 'undefined' ? window.location.href : ''),
+        user_data: params.user_data || {},
+        custom_data: {
+          ...params,
+          // Remover campos que já estão em user_data ou metadata
+          user_data: undefined,
+          event_source_url: undefined,
+          event_time: undefined,
+          action_source: undefined
+        }
+      }],
+      // Test Event Code (se configurado)
+      ...(TEST_EVENT_CODE && { test_event_code: TEST_EVENT_CODE })
+    };
+    
+    // Enviar IMEDIATAMENTE via fetch com timeout curto
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    
+    const startTime = performance.now();
+    
+    const response = await fetch(`${CAPI_GATEWAY_URL}?id=${META_PIXEL_ID}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+      // Não esperar resposta (fire and forget para máxima velocidade)
+      keepalive: true
+    });
+    
+    clearTimeout(timeoutId);
+    
+    const latency = Math.round(performance.now() - startTime);
+    
+    if (response.ok) {
+      console.log(`⚡ CAPI Gateway: ${eventName} enviado em ${latency}ms`);
+    } else {
+      console.warn(`⚠️ CAPI Gateway: ${eventName} - Status ${response.status}`);
+    }
+    
+  } catch (error) {
+    // Não bloquear execução em caso de erro
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.warn(`⚠️ CAPI Gateway: Erro ao enviar ${eventName}:`, errorMessage);
   }
 }
 
@@ -233,13 +307,18 @@ export async function fireMetaEventDefinitivo(
       ...customParams
     };
     
-    // 4. Disparar evento
-    if (typeof window !== 'undefined' && window.fbq) {
-      console.log(`🎛️ MODO STAPE: ${BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY'} - Evento: ${eventName}`);
-      console.log(`📡 Meta Pixel dispara SEMPRE para gerar eventos para CAPI Gateway`);
+    // 4. Disparar evento INSTANTANEAMENTE para CAPI Gateway
+    console.log(`🎛️ MODO: ${BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY'} - Evento: ${eventName}`);
+    
+    // 🚀 ENVIO DIRETO E INSTANTÂNEO PARA CAPI GATEWAY (SEM DELAY)
+    if (typeof window !== 'undefined') {
+      // Enviar IMEDIATAMENTE para CAPI Gateway via fetch (não espera Meta Pixel)
+      sendToCapiGatewayInstant(eventName, params, eventId).catch(err => {
+        console.error('❌ Erro ao enviar para CAPI Gateway:', err);
+      });
       
-      if (BROWSER_PIXEL_ENABLED) {
-        // ✅ MODO HÍBRIDO: Browser + CAPI Gateway
+      // Se modo HÍBRIDO, também dispara via browser pixel
+      if (BROWSER_PIXEL_ENABLED && window.fbq) {
         if (eventType === 'custom') {
           window.fbq('trackCustom', eventName, params, fbqOptions);
         } else {
@@ -247,14 +326,7 @@ export async function fireMetaEventDefinitivo(
         }
         console.log(`🌐 MODO HÍBRIDO: ${eventName} via Browser + CAPI Gateway`);
       } else {
-        // ✅ MODO CAPI-ONLY: Apenas CAPI Gateway
-        if (eventType === 'custom') {
-          window.fbq('trackCustom', eventName, params, fbqOptions);
-        } else {
-          window.fbq('track', eventName, params, fbqOptions);
-        }
-        console.log(`🚫 MODO CAPI-ONLY: ${eventName} apenas via CAPI Gateway (server_event_uri)`);
-        console.log(`📡 Meta Pixel gerou evento, mas browser não envia - apenas CAPI Gateway processa`);
+        console.log(`🚀 MODO CAPI-ONLY: ${eventName} enviado INSTANTANEAMENTE via CAPI Gateway`);
       }
       
       console.log(`✅ ${eventName} processado com sucesso (Nota 9.5+ mantida):`);
