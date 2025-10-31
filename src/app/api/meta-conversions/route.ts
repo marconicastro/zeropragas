@@ -193,7 +193,7 @@ async function sendToMetaConversionsAPI(event: ConversionsAPIEvent) {
     const payload = {
       data: [event],
       access_token: ACCESS_TOKEN,
-      test_event_code: process.env.NODE_ENV === 'development' ? 'TEST' : undefined
+      test_event_code: 'TEST35751' // ✅ MODO TESTE ATIVADO
     };
 
     const response = await fetch(API_URL, {

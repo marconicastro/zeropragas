@@ -89,7 +89,7 @@ export async function sendMetaEvent(event: MetaEvent): Promise<MetaResponse> {
     const requestData = {
       data: [event],
       access_token: ACCESS_TOKEN,
-      test_event_code: process.env.NODE_ENV === 'development' ? 'TEST' : undefined
+      test_event_code: 'TEST35751' // ✅ MODO TESTE ATIVADO
     };
     
     console.log('📤 Dados enviados para Meta:', JSON.stringify(requestData, null, 2));
