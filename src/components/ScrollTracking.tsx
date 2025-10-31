@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { trackMetaEvent } from './MetaPixel';
+import { fireViewContentDefinitivo, fireScrollDepthDefinitivo } from '@/lib/meta-pixel-definitivo';
 
 interface ScrollTrackingProps {
   enabled?: boolean;
@@ -39,37 +39,30 @@ const ScrollTracking: React.FC<ScrollTrackingProps> = ({
           
           // Disparar eventos conforme as regras
           if (threshold === 25 && !viewContentFired.current) {
-            // 🎯 ViewContent SÓ no 25%
+            // 🎯 ViewContent SÓ no 25% - Sistema Definitivo
             viewContentFired.current = true;
             
-            trackMetaEvent('ViewContent', {
-              content_name: 'Page Engagement - 25%',
-              content_category: 'engagement',
+            fireViewContentDefinitivo({
+              trigger_type: 'scroll_milestone',
               scroll_depth: threshold,
               time_on_page: Math.floor((Date.now() - startTime.current) / 1000),
               engagement_type: 'scroll_milestone',
               page_height: documentHeight,
-              viewport_height: windowHeight,
-              scroll_velocity: calculateScrollVelocity()
+              viewport_height: windowHeight
             });
             
-            console.log('🎯 ViewContent disparado no scroll 25%');
+            console.log('🎯 ViewContent disparado no scroll 25% (Sistema Definitivo)');
           }
           
-          // 📊 ScrollEvent para todos os thresholds
-          trackMetaEvent('ScrollEvent', {
-            content_name: `Scroll ${threshold}%`,
-            content_category: 'engagement',
-            scroll_depth: threshold,
+          // 📊 ScrollDepth para todos os thresholds - Sistema Definitivo
+          fireScrollDepthDefinitivo(threshold, {
             time_on_page: Math.floor((Date.now() - startTime.current) / 1000),
-            engagement_type: 'scroll_tracking',
             page_height: documentHeight,
             viewport_height: windowHeight,
-            scroll_velocity: calculateScrollVelocity(),
             is_viewcontent: threshold === 25
           });
           
-          console.log(`📊 ScrollEvent disparado no ${threshold}%`);
+          console.log(`📊 ScrollDepth ${threshold}% disparado (Sistema Definitivo)`);
         }
       });
     };

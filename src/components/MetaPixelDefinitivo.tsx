@@ -19,7 +19,9 @@ interface MetaPixelDefinitivoProps {
   pixelId?: string;
 }
 
-const MetaPixelDefinitivo: React.FC<MetaPixelDefinitivoProps> = ({ pixelId = '642933108377475' }) => {
+const MetaPixelDefinitivo: React.FC<MetaPixelDefinitivoProps> = ({ 
+  pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || '642933108377475' 
+}) => {
   useEffect(() => {
     // Inicializar sistema de persistência
     const persistedUserData = initializePersistence();
@@ -61,7 +63,8 @@ const MetaPixelDefinitivo: React.FC<MetaPixelDefinitivoProps> = ({ pixelId = '64
         window.fbq('set', 'agent', 'stape');
         
         // 🔗 CONFIGURAÇÃO CRÍTICA - server_event_uri para CAPI Gateway
-        window.fbq('set', 'server_event_uri', 'https://capig.maracujazeropragas.com/');
+        const capiGatewayUrl = process.env.NEXT_PUBLIC_CAPI_GATEWAY_URL || 'https://capig.maracujazeropragas.com/';
+        window.fbq('set', 'server_event_uri', capiGatewayUrl);
         
         // 🎛️ CONTROLE DO FLUXO - MODO STAPE CORRETO
         console.log(`🎛️ SISTEMA DEFINITIVO - MODO: ${BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY'}`);
