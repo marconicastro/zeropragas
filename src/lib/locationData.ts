@@ -4,7 +4,7 @@
  * EXPLICAÇÃO COMPLETA: Como estes parâmetros são preenchidos
  */
 
-import { getPersistedUserData } from './userDataPersistence';
+import { getPersistedUserData } from './userData';
 
 /**
  * EXPLICAÇÃO: Fontes dos dados de localização

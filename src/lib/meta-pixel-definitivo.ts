@@ -24,7 +24,8 @@ import {
 import { generateCorrelatedEventId } from './persistent-event-id';
 import { getEnrichedClientData } from './clientInfoService';
 import { getCurrentTimestamp } from './timestampUtils';
-import { getAdvancedEnrichment, type EnrichmentData } from './enrichment';
+import { getAdvancedEnrichment } from './enrichment/index';
+import type { EnrichmentData } from './enrichment/types';
 
 // 🎛️ CONTROLE DE MODO (Mantido exatamente como estava)
 const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
@@ -77,12 +78,14 @@ function generateEventId(eventName: string, orderId?: string): string {
  */
 async function getUserDataForEvent(): Promise<MetaFormattedUserData> {
   try {
-    // Obter dados completos já hasheados do sistema unificado
+    // Obter dados completos do sistema unificado
     const completeUserData = await getCompleteUserData();
-    const hashedUserData = await formatAndHashUserData(completeUserData);
     
-    // Enriquecer com dados do cliente em tempo real
-    const enrichedClientData = await getEnrichedClientData(completeUserData);
+    // Executar hash e enriquecimento em paralelo
+    const [hashedUserData, enrichedClientData] = await Promise.all([
+      formatAndHashUserData(completeUserData),
+      getEnrichedClientData(completeUserData)
+    ]);
     
     // Combinar dados
     const finalUserData: MetaFormattedUserData = {
@@ -98,7 +101,7 @@ async function getUserDataForEvent(): Promise<MetaFormattedUserData> {
       hasName: !!(finalUserData.fn && finalUserData.ln),
       hasCity: !!finalUserData.ct,
       hasState: !!finalUserData.st,
-      hasZip: !!finalUserData.zp,
+      hasZip: !!('zp' in finalUserData ? finalUserData.zp : null),
       hasCountry: !!finalUserData.country,
       totalFields: Object.keys(finalUserData).filter(k => finalUserData[k as keyof MetaFormattedUserData]).length
     });
@@ -122,28 +125,55 @@ async function getUserDataForEvent(): Promise<MetaFormattedUserData> {
 }
 
 // Funções de enriquecimento movidas para /enrichment/ (modular)
+// ============================================
+// INTERFACES E TIPOS
+// ============================================
+
+interface DeduplicationOptions {
+  orderId?: string;
+  userEmail?: string;
+}
+
+interface EventResult {
+  eventName: string;
+  success: boolean;
+  eventId?: string;
+  mode?: string;
+  nota?: string;
+  error?: string;
+}
+
+interface EventParams {
+  [key: string]: any;
+  user_data?: MetaFormattedUserData;
+  event_id?: string;
+  event_time?: number;
+  event_source_url?: string;
+  action_source?: string;
+}
+
 /**
  * 🚀 Função principal de disparo de eventos (Unificada)
  */
 export async function fireMetaEventDefinitivo(
   eventName: string,
-  customParams: any = {},
+  customParams: Record<string, any> = {},
   eventType: 'standard' | 'custom' = 'standard',
-  deduplicationOptions?: { orderId?: string; userEmail?: string }
-): Promise<any> {
+  deduplicationOptions?: DeduplicationOptions
+): Promise<EventResult> {
   try {
     console.group(`🎯 ${eventName} - Sistema Definitivo (Nota 9.3)`);
     
-    // 1. Obter dados completos do usuário (sistema unificado)
-    const userData = await getUserDataForEvent();
+    // 1. Obter dados em paralelo para melhor performance
+    const [userData, advancedEnrichment] = await Promise.all([
+      getUserDataForEvent(),
+      getAdvancedEnrichment()
+    ]);
     
-    // 2. Obter enriquecimento avançado
-    const advancedEnrichment = await getAdvancedEnrichment();
-    
-    // 3. Gerar chaves de deduplicação
+    // 2. Gerar chaves de deduplicação
     let eventId: string;
-    let fbqOptions: any = {};
-    let deduplicationKeys: any = {};
+    let fbqOptions: { eventID: string } = { eventID: '' };
+    let deduplicationKeys: Record<string, string | undefined> = {};
     
     if (deduplicationOptions?.orderId) {
       eventId = generateEventId(eventName, deduplicationOptions.orderId);
@@ -160,8 +190,8 @@ export async function fireMetaEventDefinitivo(
       deduplicationKeys = { event_id: eventId };
     }
     
-    // 4. Parâmetros completos com enriquecimento avançado
-    const params = {
+    // 3. Parâmetros completos com enriquecimento avançado
+    const params: EventParams = {
       // Dados do usuário (100% cobertura - Nota 9.3)
       ...(Object.keys(userData).length > 0 && { user_data: userData }),
       
@@ -180,7 +210,7 @@ export async function fireMetaEventDefinitivo(
       ...customParams
     };
     
-    // 4. Disparar evento - MODO STAPE CORRETO
+    // 4. Disparar evento
     if (typeof window !== 'undefined' && window.fbq) {
       console.log(`🎛️ MODO STAPE: ${BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY'} - Evento: ${eventName}`);
       console.log(`📡 Meta Pixel dispara SEMPRE para gerar eventos para CAPI Gateway`);
@@ -207,7 +237,7 @@ export async function fireMetaEventDefinitivo(
       console.log(`✅ ${eventName} processado com sucesso (Nota 9.3 mantida):`);
       console.log('  🆔 Event ID:', eventId);
       console.log('  📊 Dados pessoais:', !!(userData.em && userData.ph && userData.fn && userData.ln));
-      console.log('  🌍 Dados geográficos:', !!(userData.ct && userData.st && userData.zip && userData.country));
+      console.log('  🌍 Dados geográficos:', !!(userData.ct && userData.st && ('zp' in userData) && userData.country));
       console.log('  🔑 Deduplicação:', '✅ Completa');
       console.log('  🎯 Enriquecimento Avançado:', '✅ Facebook Ads + Dispositivo + Performance');
       console.log('  📱 Campaign Data:', !!(advancedEnrichment.campaign_name && advancedEnrichment.ad_name));
@@ -244,7 +274,7 @@ export async function fireMetaEventDefinitivo(
 /**
  * 📄 PageView - Nota 9.3/10 (Padronizado COMPLETO como eventos de alta qualidade)
  */
-export async function firePageViewDefinitivo(customParams: any = {}) {
+export async function firePageViewDefinitivo(customParams: Record<string, any> = {}): Promise<EventResult> {
   return fireMetaEventDefinitivo('PageView', {
     // 🎯 DADOS COMERCIAIS COMPLETOS (idêntico ViewContent)
     value: 39.9,
@@ -294,7 +324,7 @@ export async function firePageViewDefinitivo(customParams: any = {}) {
 /**
  * 👁️ ViewContent - Nota 9.3/10
  */
-export async function fireViewContentDefinitivo(customParams: any = {}) {
+export async function fireViewContentDefinitivo(customParams: Record<string, any> = {}): Promise<EventResult> {
   return fireMetaEventDefinitivo('ViewContent', {
     value: 39.9,
     currency: 'BRL',
@@ -315,7 +345,7 @@ export async function fireViewContentDefinitivo(customParams: any = {}) {
 /**
  * 📜 ScrollDepth - Nota 9.3/10
  */
-export async function fireScrollDepthDefinitivo(percent: number, customParams: any = {}) {
+export async function fireScrollDepthDefinitivo(percent: number, customParams: Record<string, any> = {}): Promise<EventResult> {
   return fireMetaEventDefinitivo('ScrollDepth', {
     percent: percent,
     scroll_depth: percent,
@@ -333,7 +363,7 @@ export async function fireScrollDepthDefinitivo(percent: number, customParams: a
 /**
  * 🖱️ CTAClick - Nota 9.3/10
  */
-export async function fireCTAClickDefinitivo(buttonText: string, customParams: any = {}) {
+export async function fireCTAClickDefinitivo(buttonText: string, customParams: Record<string, any> = {}): Promise<EventResult> {
   return fireMetaEventDefinitivo('CTAClick', {
     content_name: `CTA: ${buttonText}`,
     content_category: 'button_click',
@@ -352,7 +382,7 @@ export async function fireCTAClickDefinitivo(buttonText: string, customParams: a
 /**
  * 🎯 Lead - Nota 9.3/10
  */
-export async function fireLeadDefinitivo(customParams: any = {}) {
+export async function fireLeadDefinitivo(customParams: Record<string, any> = {}): Promise<EventResult> {
   return fireMetaEventDefinitivo('Lead', {
     value: 15.00,
     currency: 'BRL',
@@ -378,7 +408,7 @@ export async function fireLeadDefinitivo(customParams: any = {}) {
 /**
  * 🛒 InitiateCheckout - Nota 9.3/10
  */
-export async function fireInitiateCheckoutDefinitivo(customParams: any = {}) {
+export async function fireInitiateCheckoutDefinitivo(customParams: Record<string, any> = {}): Promise<EventResult> {
   return fireMetaEventDefinitivo('InitiateCheckout', {
     value: 39.9,
     currency: 'BRL',
@@ -405,7 +435,7 @@ export async function fireInitiateCheckoutDefinitivo(customParams: any = {}) {
 /**
  * 🧪 Dispara todos os eventos para teste (Mantido para debug)
  */
-export async function fireAllEventsDefinitivo() {
+export async function fireAllEventsDefinitivo(): Promise<void> {
   console.group('🚀 SISTEMA DEFINITIVO - TODOS OS EVENTOS (Nota 9.3)');
   console.log('📊 SISTEMA UNIFICADO ATIVO:');
   console.log('  ✅ Dados geográficos 100% em todos eventos');
@@ -448,10 +478,18 @@ export async function fireAllEventsDefinitivo() {
   console.groupEnd();
 }
 
+interface ModeInfo {
+  browserPixelEnabled: boolean;
+  mode: string;
+  description: string;
+  sistema: string;
+  qualidade: string;
+}
+
 /**
  * 🎛️ Verifica modo atual de operação
  */
-export function getCurrentModeDefinitivo() {
+export function getCurrentModeDefinitivo(): ModeInfo {
   return {
     browserPixelEnabled: BROWSER_PIXEL_ENABLED,
     mode: BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY',
@@ -463,21 +501,30 @@ export function getCurrentModeDefinitivo() {
   };
 }
 
-/**
- * 🛒 PURCHASE ENTERPRISE - Nível 9.3/10 com controle total
- */
-export const firePurchaseDefinitivo = async (purchaseData: {
+interface PurchaseData {
   transaction_id: string;
   value: number;
   currency: string;
   content_ids: string[];
   content_name: string;
   content_type?: string;
-  user_data?: any;
-  enterprise_ids?: any;
-  commercial_data?: any;
-  tracking_metadata?: any;
-}) => {
+  user_data?: Partial<MetaFormattedUserData>;
+  enterprise_ids?: {
+    session_id?: string;
+    user_id?: string;
+  };
+  commercial_data?: {
+    content_name?: string;
+    value?: number;
+    currency?: string;
+  };
+  tracking_metadata?: Record<string, any>;
+}
+
+/**
+ * 🛒 PURCHASE ENTERPRISE - Nível 9.3/10 com controle total
+ */
+export const firePurchaseDefinitivo = async (purchaseData: PurchaseData): Promise<void> => {
   try {
     // Gerar eventID único para Purchase
     const eventId = `Purchase_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -504,8 +551,8 @@ export const firePurchaseDefinitivo = async (purchaseData: {
         currency: purchaseData.commercial_data.currency
       }),
       
-      // Dados do usuário (hash automático)
-      ...(purchaseData.user_data && formatUserDataForMeta(purchaseData.user_data)),
+      // Dados do usuário (usar diretamente se fornecido)
+      ...(purchaseData.user_data || {}),
       
       // Metadados enterprise
       ...(purchaseData.enterprise_ids && {

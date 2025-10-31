@@ -8,7 +8,6 @@ import { getDeviceData } from './device';
 import { getPerformanceData } from './performance';
 import { getFacebookAdsData } from './facebook';
 import { getSessionData } from './session';
-import type { EnrichmentData } from './types';
 
 // Re-exportar tipos
 export type { 
@@ -18,6 +17,9 @@ export type {
   FacebookAdsData, 
   SessionData 
 } from './types';
+
+// Importar tipo localmente
+import type { EnrichmentData } from './types';
 
 /**
  * Coleta todos os dados de enriquecimento de forma otimizada

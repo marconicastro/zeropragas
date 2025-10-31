@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { getEnrichedUserData, formatEnrichedDataForMeta, debugEnrichedData, hasEnrichedData } from '@/lib/enrichedUserData';
 import { getClientInfo } from '@/lib/enrichedUserData';
-import { getPersistedUserData } from '@/lib/userDataPersistence';
+import { getPersistedUserData } from '@/lib/userData';
 
 const EnrichedDataDebug: React.FC = () => {
   const [debugData, setDebugData] = useState<any>({});

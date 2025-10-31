@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
+import { getPersistedUserData, formatUserDataForMeta } from '@/lib/userData';
 import { getBestAvailableLocation } from '@/lib/locationData';
 import { getClientIPFromFrontend, IP_EXPLANATION } from '@/lib/ipDetection';
 import { getClientInfo, getEnrichedClientData } from '@/lib/clientInfoService';
