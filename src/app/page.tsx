@@ -9,14 +9,14 @@ import { fireScrollDepthDefinitivo, fireViewContentDefinitivo, fireCTAClickDefin
 import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
+import { PRODUCT_CONFIG, ProductHelpers } from '@/config/product';
 
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
 import { useUTMs } from '@/hooks/use-utm';
 
 export default function App() {
-  // 💰 CONFIGURAÇÃO DINÂMICA DE PREÇOS
-  const BASE_PRODUCT_PRICE = 39.90; // Valor base do produto
-  const [dynamicPrice, setDynamicPrice] = useState(BASE_PRODUCT_PRICE);
+  // 💰 CONFIGURAÇÃO CENTRALIZADA DE PREÇOS
+  const [dynamicPrice, setDynamicPrice] = useState(PRODUCT_CONFIG.BASE_PRICE);
   
   // 🎯 Hook de UTMs - Sistema unificado e seguro
   const { 
@@ -134,10 +134,10 @@ export default function App() {
       console.log(`🎯 ViewContent disparado por ${triggerType} - Sistema Definitivo`);
       
       await fireViewContentDefinitivo({
-        content_name: 'Sistema 4 Fases - Ebook Trips',
-        content_ids: ['hacr962'],
-        value: dynamicPrice, // VALOR DINÂMICO
-        currency: 'BRL',
+        content_name: PRODUCT_CONFIG.NAME,
+        content_ids: PRODUCT_CONFIG.CONTENT_IDS,
+        value: dynamicPrice,
+        currency: PRODUCT_CONFIG.CURRENCY,
         content_type: 'product',
         trigger_type: triggerType,
         time_on_page: Math.floor((Date.now() - startTime) / 1000),
@@ -214,9 +214,9 @@ export default function App() {
     secureParams['event_id'] = enterpriseIds.event_id;
     
     // Dados comerciais (sem informações pessoais)
-    secureParams['product_id'] = 'hacr962';
-    secureParams['value'] = dynamicPrice.toString(); // VALOR DINÂMICO
-    secureParams['currency'] = 'BRL';
+    secureParams['product_id'] = PRODUCT_CONFIG.SHORT_ID;
+    secureParams['value'] = dynamicPrice.toString();
+    secureParams['currency'] = PRODUCT_CONFIG.CURRENCY;
     
     // 🎯 UTMs do nosso sistema próprio (apenas os principais)
     if (hasUTMs) {
@@ -264,11 +264,11 @@ export default function App() {
       
       // Dados comerciais completos
       commercial_data: {
-        product_id: 'hacr962',
-        product_name: 'Sistema 4 Fases - Ebook Trips',
+        product_id: PRODUCT_CONFIG.SHORT_ID,
+        product_name: PRODUCT_CONFIG.NAME,
         content_type: 'product',
-        value: dynamicPrice, // VALOR DINÂMICO
-        currency: 'BRL'
+        value: dynamicPrice,
+        currency: PRODUCT_CONFIG.CURRENCY
       },
       
       // URLs de produção
@@ -311,10 +311,10 @@ export default function App() {
     // ✅ NOVO: Salvar dados completos para backup de Purchase
     const purchaseIntent = {
       ...userDataToSave,
-      product_id: 'hacr962',
-      value: dynamicPrice, // VALOR DINÂMICO
-      currency: 'BRL',
-      product_name: 'Sistema 4 Fases - Ebook Trips',
+      product_id: PRODUCT_CONFIG.SHORT_ID,
+      value: dynamicPrice,
+      currency: PRODUCT_CONFIG.CURRENCY,
+      product_name: PRODUCT_CONFIG.NAME,
       secure_params: Object.keys(secureParams).map(key => `${key}=${secureParams[key]}`).join('&')
     };
     
@@ -326,10 +326,10 @@ export default function App() {
       content_name: 'Lead - Formulário Preenchido',
       content_category: 'Formulário',
       value: 15.00,
-      currency: 'BRL',
+      currency: PRODUCT_CONFIG.CURRENCY,
       content_ids: ['lead_form_main'],
       content_type: 'lead_form',
-      predicted_ltv: 180,
+      predicted_ltv: ProductHelpers.getLTV(),
       lead_type: 'contact_request',
       lead_source: 'website_form',
       form_position: 'main_page',
@@ -350,10 +350,10 @@ export default function App() {
 
     // Disparar evento InitiateCheckout com sistema definitivo
     await fireInitiateCheckoutDefinitivo({
-      value: dynamicPrice, // VALOR DINÂMICO
-      currency: 'BRL',
-      content_name: 'Sistema 4 Fases - Ebook Trips',
-      content_ids: ['hacr962'],
+      value: dynamicPrice,
+      currency: PRODUCT_CONFIG.CURRENCY,
+      content_name: PRODUCT_CONFIG.NAME,
+      content_ids: PRODUCT_CONFIG.CONTENT_IDS,
       content_type: 'product',
       num_items: 1,
       checkout_step: 1,
@@ -381,8 +381,7 @@ export default function App() {
     });
 
     // Construir URL final SEGURA (apenas IDs e dados comerciais)
-    // LINK ATUALIZADO: https://pay.cakto.com.br/hacr962_605077 (migrado para Cakto)
-    const finalUrlString = `https://pay.cakto.com.br/hacr962_605077?${new URLSearchParams(secureParams).toString()}`;
+    const finalUrlString = ProductHelpers.buildCheckoutURL(secureParams);
     
     console.log('🔗 URL SEGURA gerada:', finalUrlString);
     console.log('📊 Tamanho da URL:', finalUrlString.length, 'caracteres');
@@ -412,9 +411,9 @@ export default function App() {
   const scrollToCheckout = async () => {
     // Disparar evento específico de CTA
     await fireCTAClickDefinitivo('Quero Economizar', {
-      content_ids: ['hacr962'],
-      value: dynamicPrice, // VALOR DINÂMICO
-      currency: 'BRL',
+      content_ids: PRODUCT_CONFIG.CONTENT_IDS,
+      value: dynamicPrice,
+      currency: PRODUCT_CONFIG.CURRENCY,
       content_type: 'product',
       cta_type: 'main_checkout_scroll',
       action: 'scroll_to_checkout'
@@ -427,9 +426,9 @@ export default function App() {
   const handleCheckoutRedirect = async (event) => {
     // Disparar evento específico de CTA final
     await fireCTAClickDefinitivo('Final Checkout', {
-      content_ids: ['hacr962'],
-      value: dynamicPrice, // VALOR DINÂMICO
-      currency: 'BRL',
+      content_ids: PRODUCT_CONFIG.CONTENT_IDS,
+      value: dynamicPrice,
+      currency: PRODUCT_CONFIG.CURRENCY,
       content_type: 'product',
       cta_type: 'final_checkout_modal',
       action: 'open_modal'

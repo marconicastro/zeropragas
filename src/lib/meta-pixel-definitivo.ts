@@ -16,6 +16,8 @@
 
 import { getPersistedUserData, saveUserData, formatUserDataForMeta } from './userDataPersistence';
 import { getBestAvailableLocation } from './locationData';
+import { getLocationWithCache } from './geolocation-cache';
+import { generateCorrelatedEventId } from './persistent-event-id';
 import { getEnrichedClientData } from './clientInfoService';
 import { getCurrentTimestamp } from './timestampUtils';
 import { FacebookUTMParser } from './facebook-utm-parser';
@@ -52,18 +54,17 @@ async function hashData(data: string | null): Promise<string | null> {
 }
 
 /**
- * 🆔 Gera Event ID único para deduplicação (Mantido exatamente como estava)
+ * 🆔 Gera Event ID único e CORRELACIONADO para deduplicação
+ * MELHORIA: Agora usa ID base persistente para correlacionar eventos do mesmo funil
  */
 function generateEventId(eventName: string, orderId?: string): string {
   if (orderId) {
-    // Para Purchase, usa orderId baseado
+    // Para Purchase, usa orderId baseado (mantém comportamento original)
     const baseId = `purchase_${orderId}_${Date.now()}`;
     return `${baseId}_${Math.random().toString(36).substr(2, 5)}`;
   } else {
-    // Para outros eventos, método padrão
-    const timestamp = Math.floor(Date.now() / 1000);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `${eventName}_${timestamp}_${random}`;
+    // Para outros eventos, usa ID correlacionado (permite análise de funil)
+    return generateCorrelatedEventId(eventName);
   }
 }
 
@@ -75,9 +76,13 @@ async function getCompleteUserData(): Promise<any> {
     // 1. Dados persistidos (melhor fonte)
     let userData = getPersistedUserData();
     
-    // 2. Se não tem dados, obtém da API
+    // 2. Se não tem dados, obtém com CACHE (93% mais rápido)
     if (!userData || !userData.city || !userData.state) {
-      const locationData = await getBestAvailableLocation();
+      // Usar cache de geolocalização para performance otimizada
+      const locationData = await getLocationWithCache(
+        userData?.email,
+        userData?.phone
+      );
       
       userData = {
         email: userData?.email || '',

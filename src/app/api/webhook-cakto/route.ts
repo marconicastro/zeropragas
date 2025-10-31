@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { db } from '@/lib/db';
+import { PRODUCT_CONFIG, ProductHelpers } from '@/config/product';
 
 // Configurações do Meta
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
@@ -8,7 +9,7 @@ const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAUsqHMv8GcBP5dQ8Hj
 
 // Configurações da Cakto
 const CAKTO_SECRET = process.env.CAKTO_SECRET || '12f4848f-35e9-41a8-8da4-1032642e3e89';
-const CAKTO_PRODUCT_ID = 'hacr962'; // Content ID do produto na Cakto
+const CAKTO_PRODUCT_ID = PRODUCT_CONFIG.SHORT_ID; // Content ID do produto centralizado
 
 // Configurações Enterprise
 const WEBHOOK_VERSION = '3.1-enterprise-unified-server';
@@ -79,9 +80,9 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
   // Dados da Cakto
   const amount = caktoData.amount || 0;
   const transactionId = caktoData.id || '';
-  const productName = caktoData.product?.name || 'Sistema 4 Fases';
+  const productName = caktoData.product?.name || PRODUCT_CONFIG.NAME;
   const paymentMethod = caktoData.paymentMethod || 'unknown';
-  const offerId = caktoData.offer?.id || CAKTO_PRODUCT_ID;
+  const offerId = caktoData.offer?.id || PRODUCT_CONFIG.SHORT_ID;
   
   // Dados do cliente da Cakto
   const customerEmail = caktoData.customer?.email || '';
@@ -239,26 +240,26 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
       // Custom Data AVANÇADO - 50+ PARÂMETROS
       custom_data: {
         // Básicos obrigatórios
-        currency: 'BRL',
+        currency: PRODUCT_CONFIG.CURRENCY,
         value: amount,
-        content_ids: [caktoData.product?.short_id || CAKTO_PRODUCT_ID],
+        content_ids: [caktoData.product?.short_id || PRODUCT_CONFIG.SHORT_ID],
         content_name: productName,
         content_type: 'product',
         transaction_id: transactionId,
         
         // Avançados para nota 9.3+
-        content_category: 'digital_product',
+        content_category: PRODUCT_CONFIG.CATEGORY,
         content_category2: 'agricultura',
         content_category3: 'pragas',
         content_category4: 'sistema_4_fases',
         content_category5: 'maracuja',
         
         // Detalhes do produto
-        brand: 'Maracujá Zero Pragas',
-        description: 'Sistema completo para eliminação de trips no maracujazeiro',
-        availability: 'in stock',
-        condition: 'new',
-        quantity: 1,
+        brand: PRODUCT_CONFIG.BRAND,
+        description: PRODUCT_CONFIG.DESCRIPTION,
+        availability: PRODUCT_CONFIG.AVAILABILITY,
+        condition: PRODUCT_CONFIG.CONDITION,
+        quantity: PRODUCT_CONFIG.NUM_ITEMS,
         
         // Preço e promoções (100% DINÂMICO)
         price: amount,
@@ -266,11 +267,11 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
         discount_percentage: Math.round((1 - (amount / (amount * 4))) * 100), // Calculado dinamicamente
         coupon: '',
         
-        // Order Bump e upsells detectados automaticamente
-        order_bump_detected: amount > 50, // Detecta automaticamente Order Bumps
-        base_product_value: amount > 50 ? 39.90 : amount, // Valor base do produto
-        bump_value: amount > 50 ? amount - 39.90 : 0, // Valor adicional do bump
-        total_items: amount > 50 ? 2 : 1, // Quantidade de itens detectada
+        // Order Bump e upsells detectados automaticamente (dinâmico)
+        order_bump_detected: ProductHelpers.isOrderBump(amount),
+        base_product_value: ProductHelpers.getBaseValue(amount),
+        bump_value: ProductHelpers.getBumpValue(amount),
+        total_items: ProductHelpers.getItemsCount(amount),
         
         // Métodos de entrega
         delivery_category: 'home_delivery', // Valor aceito pela Meta
@@ -288,8 +289,8 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
         
         // Dados do cliente para segmentação (DINÂMICO)
         customer_type: 'web',
-        customer_segment: amount > 100 ? 'premium_plus' : amount > 50 ? 'premium' : 'standard',
-        customer_lifetime_value: amount * 12, // LTV estimado dinâmico
+        customer_segment: amount > 100 ? 'premium_plus' : ProductHelpers.isOrderBump(amount) ? 'premium' : 'standard',
+        customer_lifetime_value: ProductHelpers.getLTV(), // LTV estimado dinâmico
         
         // Dados de campanha
         utm_source: 'organic',

@@ -36,41 +36,20 @@ export default function Obrigado() {
         const orderId = `order_${timestamp}_${randomSuffix}`;
         const transactionId = `txn_${timestamp}_${randomSuffix}`;
 
-        // 🎯 DISPARAR EVENTO PURCHASE AVANÇADO
-        await MetaAdvancedEvents.firePurchaseAdvanced({
-          content_name: 'Sistema 4 Fases - Ebook Trips',
-          content_ids: ['339591'],
-          value: intent.value || 39.90,
-          currency: intent.currency || 'BRL',
-          content_type: 'product',
-          email: intent.email,
-          phone: intent.phone,
-          fullName: intent.fullName,
-          city: intent.city,
-          state: intent.state,
-          zipCode: intent.cep,
-          order_id: orderId,
-          transaction_id: transactionId,
-          payment_method: 'credit_card', // ou detectar da URL
-          custom_data: {
-            product_category: 'digital_guide',
-            delivery_type: 'digital_download',
-            num_items: 1,
-            order_type: 'online_purchase',
-            checkout_type: 'redirect_success',
-            payment_status: 'completed',
-            fulfillment_status: 'processing',
-            customer_type: 'new_customer',
-            source: 'meta_ads',
-            utm_source: urlParams.get('utm_source') || 'unknown',
-            utm_medium: urlParams.get('utm_medium') || 'unknown',
-            utm_campaign: urlParams.get('utm_campaign') || 'unknown'
-          }
-        });
-
-        console.log('🎉 Purchase avançado disparado com sucesso!');
-        console.log('📊 Order ID:', orderId);
+        // ✅ PURCHASE JÁ DISPARADO VIA WEBHOOK CAKTO (evita duplicação)
+        // O webhook Cakto já dispara Purchase com dados completos quando pagamento é aprovado
+        // Esta página apenas exibe confirmação visual para o usuário
+        console.log('✅ Purchase disparado via Webhook Cakto (não duplicado)');
+        console.log('ℹ️  Esta página apenas exibe mensagem de sucesso');
+        console.log('📊 Order ID recuperado:', orderId);
         console.log('💰 Valor:', intent.value || 39.90);
+        
+        // OPCIONAL: Disparar evento customizado para análise interna (não conta como conversão)
+        // await MetaAdvancedEvents.fireCustomEvent('ThankYouPageView', {
+        //   order_id: orderId,
+        //   value: intent.value || 39.90,
+        //   currency: 'BRL'
+        // });
         
         // Limpar dados temporários
         localStorage.removeItem('userPurchaseIntent');
@@ -85,21 +64,11 @@ export default function Obrigado() {
         };
 
         if (sessionData.session_id) {
-          // Disparar purchase com dados básicos da URL
-          await MetaAdvancedEvents.firePurchaseAdvanced({
-            content_name: 'Sistema 4 Fases - Ebook Trips',
-            content_ids: [sessionData.product_id || '339591'],
-            value: parseFloat(sessionData.value) || 39.90,
-            currency: sessionData.currency || 'BRL',
-            content_type: 'product',
-            order_id: `order_${Date.now()}`,
-            transaction_id: `txn_${Date.now()}`,
-            custom_data: {
-              product_category: 'digital_guide',
-              delivery_type: 'digital_download',
-              source: 'url_parameters'
-            }
-          });
+          // ✅ PURCHASE JÁ DISPARADO VIA WEBHOOK CAKTO (evita duplicação)
+          console.log('✅ Purchase disparado via Webhook Cakto (não duplicado)');
+          console.log('ℹ️  Dados da sessão encontrados na URL:', sessionData);
+          console.log('📊 Product ID:', sessionData.product_id);
+          console.log('💰 Valor:', sessionData.value);
         }
       }
     } catch (error) {
