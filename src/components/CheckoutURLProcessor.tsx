@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, XCircle, AlertTriangle, Copy, ExternalLink, Shield, ShoppingCart } from 'lucide-react';
-import { useUTMsV2 } from '@/hooks/use-utm-v2';
+import { useUTMs } from '@/hooks/use-utm';
 
 interface CheckoutURLProcessorProps {
   onCheckoutData?: (data: any) => void;
@@ -25,7 +25,7 @@ export default function CheckoutURLProcessor({ onCheckoutData, showDebug = false
     primaryUTMs,
     addToURL,
     exportData
-  } = useUTMsV2();
+  } = useUTMs();
 
   const [inputURL, setInputURL] = useState('');
   const [processedData, setProcessedData] = useState<any>(null);

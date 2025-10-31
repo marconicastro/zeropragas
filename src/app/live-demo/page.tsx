@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 import LiveURLProcessor from '@/components/LiveURLProcessor';
-import { useUTMsV2 } from '@/hooks/use-utm-v2';
+import { useUTMs } from '@/hooks/use-utm';
 
 export default function LiveDemo() {
   const { 
@@ -31,7 +31,7 @@ export default function LiveDemo() {
     getSource,
     getCampaign,
     isAffiliateTraffic
-  } = useUTMsV2();
+  } = useUTMs();
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [isAutoRefresh, setIsAutoRefresh] = useState(false);

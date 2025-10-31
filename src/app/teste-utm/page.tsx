@@ -21,7 +21,7 @@ import {
   EyeOff
 } from 'lucide-react';
 
-import { useUTMsV2 } from '@/hooks/use-utm-v2';
+import { useUTMs } from '@/hooks/use-utm';
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
 import DebugUTM from '@/components/DebugUTM';
 import securityValidator from '@/lib/utm-security-validator';
@@ -42,7 +42,7 @@ export default function TesteUTM() {
     getSource,
     getCampaign,
     isAffiliateTraffic
-  } = useUTMsV2();
+  } = useUTMs();
 
   const [showDebug, setShowDebug] = useState(false);
   const [testURL, setTestURL] = useState('');

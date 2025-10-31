@@ -18,7 +18,7 @@ import {
   ShoppingCart,
   Eye
 } from 'lucide-react';
-import { useUTMsV2 } from '@/hooks/use-utm-v2';
+import { useUTMs } from '@/hooks/use-utm';
 import securityValidator from '@/lib/utm-security-validator';
 
 interface LiveURLProcessorProps {
@@ -33,7 +33,7 @@ export default function LiveURLProcessor({ url, title = "Processamento em Tempo 
     hasEcommerceData,
     addToURL,
     toMetaPixelData
-  } = useUTMsV2();
+  } = useUTMs();
 
   const [processedData, setProcessedData] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);

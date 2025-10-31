@@ -12,14 +12,13 @@ import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
 
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
 import { useUTMs } from '@/hooks/use-utm';
-import { useUTMsV2 } from '@/hooks/use-utm-v2';
 
 export default function App() {
   // 💰 CONFIGURAÇÃO DINÂMICA DE PREÇOS
   const BASE_PRODUCT_PRICE = 39.90; // Valor base do produto
   const [dynamicPrice, setDynamicPrice] = useState(BASE_PRODUCT_PRICE);
   
-  // 🎯 Hook de UTMs - Sistema próprio e seguro (v1.0)
+  // 🎯 Hook de UTMs - Sistema unificado e seguro
   const { 
     utms, 
     primaryUTMs, 
@@ -28,16 +27,12 @@ export default function App() {
     toURLString, 
     getSource, 
     getCampaign, 
-    isAffiliateTraffic 
-  } = useUTMs();
-
-  // 🆕 Hook de UTMs v2.0 - Com suporte para e-commerce
-  const { 
+    isAffiliateTraffic,
     checkoutData, 
     hasCheckoutData,
     hasEcommerceData,
     ecommerceData
-  } = useUTMsV2();
+  } = useUTMs();
 
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
