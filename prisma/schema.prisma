@@ -44,6 +44,12 @@ model LeadUserData {
   zipcode         String?
   country         String?
   
+  // 🎯 META PIXEL - FBP e FBC (ESSENCIAL PARA NOTA 9.5+)
+  fbp             String?  // Cookie _fbp do Meta Pixel (identifica navegador)
+  fbc             String?  // Cookie _fbc do Meta Pixel (identifica clique em anúncio)
+  fbpCapturedAt   DateTime? // Quando FBP foi capturado
+  fbcCapturedAt   DateTime? // Quando FBC foi capturado
+  
   // Metadados de captura
   captureSource   String   @default("website") // website, facebook, google
   capturePage     String?  // URL da página de captura

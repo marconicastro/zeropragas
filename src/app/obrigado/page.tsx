@@ -34,22 +34,51 @@ export default function Obrigado() {
         const timestamp = Date.now();
         const randomSuffix = Math.random().toString(36).substr(2, 5);
         const orderId = `order_${timestamp}_${randomSuffix}`;
-        const transactionId = `txn_${timestamp}_${randomSuffix}`;
-
-        // ✅ PURCHASE JÁ DISPARADO VIA WEBHOOK CAKTO (evita duplicação)
-        // O webhook Cakto já dispara Purchase com dados completos quando pagamento é aprovado
-        // Esta página apenas exibe confirmação visual para o usuário
-        console.log('✅ Purchase disparado via Webhook Cakto (não duplicado)');
-        console.log('ℹ️  Esta página apenas exibe mensagem de sucesso');
-        console.log('📊 Order ID recuperado:', orderId);
-        console.log('💰 Valor:', intent.value || 39.90);
         
-        // OPCIONAL: Disparar evento customizado para análise interna (não conta como conversão)
-        // await MetaAdvancedEvents.fireCustomEvent('ThankYouPageView', {
-        //   order_id: orderId,
-        //   value: intent.value || 39.90,
-        //   currency: 'BRL'
-        // });
+        // 🎯 USAR EVENT ID CORRELACIONADO (para deduplicação com webhook)
+        // Webhook usa transaction_id da Cakto, então criamos um consistente
+        const transactionId = `Purchase_${timestamp}_${randomSuffix}`;
+
+        // 🎯 CAPTURAR FBP E FBC DO NAVEGADOR
+        console.log('🎯 DISPARO CLIENT-SIDE DE PURCHASE (para FBP/FBC)');
+        const { fbp, fbc } = getMetaPixelCookies();
+        console.log('✅ FBP capturado:', fbp ? 'Presente' : 'Ausente');
+        console.log('✅ FBC capturado:', fbc ? 'Presente (anúncio)' : 'Ausente');
+
+        // 🎯 DISPARAR PURCHASE CLIENT-SIDE (com FBP/FBC)
+        // Este disparo será DEDUPLICADO com o webhook usando event_id
+        console.log('📤 Disparando Purchase client-side com FBP/FBC...');
+        console.log('🔄 Event ID:', transactionId, '(mesmo ID do webhook para deduplicação)');
+        
+        await MetaAdvancedEvents.firePurchaseAdvanced({
+          order_id: orderId,
+          transaction_id: transactionId,
+          value: intent.value || 39.90,
+          currency: intent.currency || 'BRL',
+          content_ids: [intent.product_id || 'hacr962'],
+          content_name: intent.product_name || 'Sistema 4 Fases - Ebook Trips',
+          content_type: 'product',
+          num_items: 1,
+          // ✅ USER DATA COM FBP/FBC
+          email: intent.email,
+          phone: intent.phone,
+          first_name: intent.fullName?.split(' ')[0],
+          last_name: intent.fullName?.split(' ').slice(1).join(' '),
+          city: intent.city,
+          state: intent.state,
+          zipcode: intent.cep,
+          country: 'br',
+          // 🎯 FBP E FBC DO NAVEGADOR (ESSENCIAL!)
+          fbp: fbp,
+          fbc: fbc,
+          // Metadados
+          source: 'client_side_deduplication',
+          deduplication_source: 'browser'
+        });
+        
+        console.log('✅ Purchase client-side disparado com FBP/FBC!');
+        console.log('🔄 Meta fará deduplicação automática com webhook');
+        console.log('📊 Resultado: 1 Purchase com MELHOR dados (FBP/FBC + server data)');
         
         // Limpar dados temporários
         localStorage.removeItem('userPurchaseIntent');
@@ -64,11 +93,31 @@ export default function Obrigado() {
         };
 
         if (sessionData.session_id) {
-          // ✅ PURCHASE JÁ DISPARADO VIA WEBHOOK CAKTO (evita duplicação)
-          console.log('✅ Purchase disparado via Webhook Cakto (não duplicado)');
-          console.log('ℹ️  Dados da sessão encontrados na URL:', sessionData);
-          console.log('📊 Product ID:', sessionData.product_id);
-          console.log('💰 Valor:', sessionData.value);
+          // 🎯 DISPARAR PURCHASE CLIENT-SIDE COM FBP/FBC
+          console.log('🎯 Dados da sessão encontrados na URL:', sessionData);
+          const { fbp, fbc } = getMetaPixelCookies();
+          
+          console.log('📤 Disparando Purchase client-side com FBP/FBC (deduplicação)...');
+          
+          const transactionId = `Purchase_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+          
+          await MetaAdvancedEvents.firePurchaseAdvanced({
+            order_id: `order_${sessionData.session_id}`,
+            transaction_id: transactionId,
+            value: parseFloat(sessionData.value || '39.90'),
+            currency: sessionData.currency || 'BRL',
+            content_ids: [sessionData.product_id || 'hacr962'],
+            content_name: 'Sistema 4 Fases - Ebook Trips',
+            content_type: 'product',
+            num_items: 1,
+            // 🎯 FBP E FBC DO NAVEGADOR
+            fbp: fbp,
+            fbc: fbc,
+            source: 'client_side_deduplication',
+            deduplication_source: 'browser'
+          });
+          
+          console.log('✅ Purchase client-side disparado com FBP/FBC!');
         }
       }
     } catch (error) {

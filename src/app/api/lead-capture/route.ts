@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
       utm_medium,
       utm_campaign,
       capture_page,
-      capture_source = 'website'
+      capture_source = 'website',
+      fbp,  // 🎯 Cookie FBP do Meta Pixel
+      fbc   // 🎯 Cookie FBC do Meta Pixel (se veio de anúncio)
     } = body;
 
     console.log('📥 Dados recebidos:', {
@@ -71,7 +73,9 @@ export async function POST(request: NextRequest) {
       name: name ? name.split(' ')[0] : 'missing',
       city,
       state,
-      capture_source
+      capture_source,
+      fbp: fbp ? '✅ Presente' : '❌ Ausente',
+      fbc: fbc ? '✅ Presente (anúncio!)' : 'ℹ️  Ausente (orgânico)'
     });
 
     // 2. Validação básica
@@ -114,6 +118,11 @@ export async function POST(request: NextRequest) {
           utmSource: utm_source || existingLead.utmSource,
           utmMedium: utm_medium || existingLead.utmMedium,
           utmCampaign: utm_campaign || existingLead.utmCampaign,
+          // 🎯 Atualizar FBP/FBC (sempre usa o mais recente)
+          fbp: fbp || existingLead.fbp,
+          fbc: fbc || existingLead.fbc,
+          fbpCapturedAt: fbp ? new Date() : existingLead.fbpCapturedAt,
+          fbcCapturedAt: fbc ? new Date() : existingLead.fbcCapturedAt,
           updatedAt: new Date()
         }
       });
@@ -156,6 +165,11 @@ export async function POST(request: NextRequest) {
           utmCampaign: utm_campaign,
           ipAddress: request.ip || request.headers.get('x-forwarded-for') || 'unknown',
           userAgent: request.headers.get('user-agent') || 'unknown',
+          // 🎯 Salvar FBP/FBC do Meta Pixel
+          fbp: fbp,
+          fbc: fbc,
+          fbpCapturedAt: fbp ? new Date() : null,
+          fbcCapturedAt: fbc ? new Date() : null,
           validated: true, // Dados capturados diretamente são validados
           validationDate: new Date()
         }

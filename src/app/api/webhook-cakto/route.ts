@@ -181,7 +181,10 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     country: sha256('br'),
     external_id: transactionId || `cakto_${Date.now()}`,
     client_ip_address: null, // CORRETO: null no backend
-    client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server'
+    client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server',
+    // 🎯 FBP e FBC do banco de dados (ESSENCIAL PARA NOTA 9.5+)
+    fbp: (userDataFromDB as any).fbp || null,
+    fbc: (userDataFromDB as any).fbc || null
   };
   
   console.log('✅ User_data COMPLETO gerado (sua estrutura):', {
@@ -191,7 +194,9 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     has_location: !!unifiedUserData.ct,
     city_original: userDataFromDB.city,
     state_original: userDataFromDB.state,
-    source: userDataFromDB.email ? 'database_lead' : 'api_geolocation'
+    source: userDataFromDB.email ? 'database_lead' : 'api_geolocation',
+    has_fbp: !!unifiedUserData.fbp,
+    has_fbc: !!unifiedUserData.fbc
   });
 
   console.log('🎯 DADOS COMPLETOS - PURCHASE:', {
@@ -222,7 +227,9 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     state_hash: unifiedUserData.st || 'empty',
     zip_hash: unifiedUserData.zp || 'empty',
     country_hash: unifiedUserData.country || 'empty',
-    external_id: unifiedUserData.external_id || 'empty'
+    external_id: unifiedUserData.external_id || 'empty',
+    fbp: unifiedUserData.fbp || '❌ ausente',
+    fbc: unifiedUserData.fbc || '❌ ausente'
   });
 
   // Purchase Event para Meta com SUA ESTRUTURA COMPLETA + parâmetros Cakto

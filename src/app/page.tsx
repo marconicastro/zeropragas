@@ -10,6 +10,7 @@ import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-p
 import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
 import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { PRODUCT_CONFIG, ProductHelpers } from '@/config/product';
+import { captureMetaPixelCookiesRobust } from '@/lib/fbp-fbc-helper';
 
 import CheckoutURLProcessor from '@/components/CheckoutURLProcessor';
 import { useUTMs } from '@/hooks/use-utm';
@@ -183,6 +184,11 @@ export default function App() {
   const handlePreCheckoutSubmit = async (formData) => {
     console.log('🚀 Dados recebidos do formulário:', formData);
     
+    // 🎯 CAPTURAR FBP E FBC (ESSENCIAL PARA NOTA 9.5+)
+    console.log('🔍 Capturando FBP e FBC do Meta Pixel...');
+    const { fbp, fbc } = await captureMetaPixelCookiesRobust();
+    console.log('✅ FBP/FBC capturados:', { fbp: fbp ? 'Presente' : 'Ausente', fbc: fbc ? 'Presente (anúncio)' : 'Ausente' });
+    
     // Gerar identificadores únicos enterprise PRIMEIRO
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substr(2, 5);
@@ -307,6 +313,41 @@ export default function App() {
     setUserData(userDataToSave);
     
     console.log('💾 Dados seguros salvos persistentemente:', userDataToSave);
+    
+    // 🎯 SALVAR LEAD NO BANCO COM FBP/FBC
+    try {
+      console.log('💾 Salvando lead no banco com FBP/FBC...');
+      const leadResponse = await fetch('/api/lead-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          phone: phoneClean,
+          name: cleanFullName,
+          city: formData.city?.trim(),
+          state: formData.state?.trim(),
+          zipcode: formData.cep?.replace(/\D/g, ''),
+          capture_page: window.location.href,
+          capture_source: 'website',
+          utm_source: getSource || 'direct',
+          utm_medium: hasUTMs ? 'web' : 'direct',
+          utm_campaign: getCampaign || 'direct',
+          fbp: fbp,  // 🎯 FBP do Meta Pixel
+          fbc: fbc   // 🎯 FBC do Meta Pixel (se houver)
+        })
+      });
+      
+      const leadResult = await leadResponse.json();
+      if (leadResult.success) {
+        console.log('✅ Lead salvo no banco com sucesso:', leadResult.leadId);
+        console.log('🎯 FBP/FBC salvos no banco para uso no Purchase server-side!');
+      } else {
+        console.warn('⚠️ Erro ao salvar lead no banco:', leadResult.error);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao salvar lead no banco:', error);
+      // Não bloquear o fluxo se houver erro
+    }
     
     // ✅ NOVO: Salvar dados completos para backup de Purchase
     const purchaseIntent = {
