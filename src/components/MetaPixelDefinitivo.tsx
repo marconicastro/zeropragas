@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { initializePersistence } from '@/lib/userDataPersistence';
+import { initializePersistence } from '@/lib/userData';
 import { getCurrentModeDefinitivo, firePageViewDefinitivo } from '@/lib/meta-pixel-definitivo';
 
 // 🎛️ CONTROLE DE MODO (Mantido exatamente como estava)

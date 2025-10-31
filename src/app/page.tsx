@@ -7,7 +7,7 @@ import PreCheckoutModal from '@/components/PreCheckoutModal';
 import OptimizedImage from '@/components/OptimizedImage';
 import { fireScrollDepthDefinitivo, fireViewContentDefinitivo, fireCTAClickDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { fireLeadDefinitivo, fireInitiateCheckoutDefinitivo } from '@/lib/meta-pixel-definitivo';
-import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userDataPersistence';
+import { saveUserData, getPersistedUserData, formatUserDataForMeta } from '@/lib/userData';
 import { getCurrentModeDefinitivo } from '@/lib/meta-pixel-definitivo';
 import { PRODUCT_CONFIG, ProductHelpers } from '@/config/product';
 import { captureMetaPixelCookiesRobust } from '@/lib/fbp-fbc-helper';

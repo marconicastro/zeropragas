@@ -6,7 +6,7 @@
  */
 
 import { fireMetaEventDefinitivo } from './meta-pixel-definitivo';
-import { getPersistedUserData, saveUserData } from './userDataPersistence';
+import { getPersistedUserData, saveUserData } from './userData';
 import { getBestAvailableLocation } from './locationData';
 
 /**

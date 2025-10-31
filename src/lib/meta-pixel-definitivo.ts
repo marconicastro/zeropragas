@@ -14,13 +14,17 @@
  * - InitiateCheckout: 9.3/10 ✅
  */
 
-import { getPersistedUserData, saveUserData, formatUserDataForMeta } from './userDataPersistence';
-import { getBestAvailableLocation } from './locationData';
-import { getLocationWithCache } from './geolocation-cache';
+import { 
+  getCompleteUserData, 
+  formatAndHashUserData,
+  getPersistedUserData,
+  saveUserData,
+  type MetaFormattedUserData 
+} from './userData';
 import { generateCorrelatedEventId } from './persistent-event-id';
 import { getEnrichedClientData } from './clientInfoService';
 import { getCurrentTimestamp } from './timestampUtils';
-import { FacebookUTMParser } from './facebook-utm-parser';
+import { getAdvancedEnrichment, type EnrichmentData } from './enrichment';
 
 // 🎛️ CONTROLE DE MODO (Mantido exatamente como estava)
 const BROWSER_PIXEL_ENABLED = process.env.NEXT_PUBLIC_BROWSER_PIXEL === 'true';
@@ -69,208 +73,55 @@ function generateEventId(eventName: string, orderId?: string): string {
 }
 
 /**
- * 👤 Obtém dados completos do usuário (Mantida qualidade 9.3)
+ * 👤 Obtém dados completos do usuário (Otimizado - Sistema Unificado)
  */
-async function getCompleteUserData(): Promise<any> {
+async function getUserDataForEvent(): Promise<MetaFormattedUserData> {
   try {
-    // 1. Dados persistidos (melhor fonte)
-    let userData = getPersistedUserData();
+    // Obter dados completos já hasheados do sistema unificado
+    const completeUserData = await getCompleteUserData();
+    const hashedUserData = await formatAndHashUserData(completeUserData);
     
-    // 2. Se não tem dados, obtém com CACHE (93% mais rápido)
-    if (!userData || !userData.city || !userData.state) {
-      // Usar cache de geolocalização para performance otimizada
-      const locationData = await getLocationWithCache(
-        userData?.email,
-        userData?.phone
-      );
-      
-      userData = {
-        email: userData?.email || '',
-        phone: userData?.phone || '',
-        fullName: userData?.fullName || '',
-        city: locationData.city,
-        state: locationData.state,
-        cep: locationData.zip,
-        country: 'br',
-        timestamp: Date.now(),
-        sessionId: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        consent: true
-      };
-      
-      saveUserData(userData);
-    }
+    // Enriquecer com dados do cliente em tempo real
+    const enrichedClientData = await getEnrichedClientData(completeUserData);
     
-    // 3. Formatar para Meta
-    const formattedData = formatUserDataForMeta(userData);
-    
-    // 4. Enriquecer com dados do cliente em tempo real
-    const enrichedClientData = await getEnrichedClientData(userData);
-    
-    // 5. Combinar com prioridade para dados reais
-    const finalUserData = {
-      ...formattedData,
-      client_ip_address: enrichedClientData.client_ip_address,
-      ct: enrichedClientData.ct,
-      st: enrichedClientData.st,
-      zip: enrichedClientData.zip,
-      country: enrichedClientData.country,
+    // Combinar dados
+    const finalUserData: MetaFormattedUserData = {
+      ...hashedUserData,
       client_timezone: enrichedClientData.client_timezone,
       client_isp: enrichedClientData.client_isp,
       client_info_source: enrichedClientData.client_info_source
     };
     
-    // 6. Hash de todos os dados PII
-    const hashedUserData = {
-      em: await hashData(finalUserData.em),
-      ph: await hashData(finalUserData.ph),
-      fn: await hashData(finalUserData.fn),
-      ln: await hashData(finalUserData.ln),
-      ct: await hashData(finalUserData.ct),
-      st: await hashData(finalUserData.st),
-      zip: await hashData(finalUserData.zip),
-      country: await hashData(finalUserData.country),
-      external_id: finalUserData.external_id,
-      client_ip_address: finalUserData.client_ip_address,
-      client_timezone: finalUserData.client_timezone,
-      client_isp: finalUserData.client_isp,
-      client_info_source: finalUserData.client_info_source
-    };
-    
     console.log('👤 Dados completos obtidos (Nota 9.3):', {
-      hasEmail: !!hashedUserData.em,
-      hasPhone: !!hashedUserData.ph,
-      hasName: !!(hashedUserData.fn && hashedUserData.ln),
-      hasCity: !!hashedUserData.ct,
-      hasState: !!hashedUserData.st,
-      hasZip: !!hashedUserData.zip,
-      hasCountry: !!hashedUserData.country,
-      totalFields: Object.keys(hashedUserData).filter(k => hashedUserData[k]).length
+      hasEmail: !!finalUserData.em,
+      hasPhone: !!finalUserData.ph,
+      hasName: !!(finalUserData.fn && finalUserData.ln),
+      hasCity: !!finalUserData.ct,
+      hasState: !!finalUserData.st,
+      hasZip: !!finalUserData.zp,
+      hasCountry: !!finalUserData.country,
+      totalFields: Object.keys(finalUserData).filter(k => finalUserData[k as keyof MetaFormattedUserData]).length
     });
     
-    return hashedUserData;
+    return finalUserData;
     
   } catch (error) {
     console.error('❌ Erro ao obter dados do usuário:', error);
     
-    // Fallback mínimo (mantido do sistema original)
+    // Fallback mínimo
     return {
-      ct: 'sao paulo',
-      st: 'sp',
-      zip: '01310',
-      country: 'br',
+      ct: await hashData('sao paulo'),
+      st: await hashData('sp'),
+      zp: await hashData('01310'),
+      country: await hashData('br'),
       external_id: `sess_${Date.now()}`,
-      client_user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : ''
+      client_user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
+      client_ip_address: null
     };
   }
 }
 
-/**
- * 🚀 Enriquecimento Avançado para todos os eventos
- */
-async function getAdvancedEnrichment(): Promise<any> {
-  try {
-    // Extrair UTMs do Facebook
-    const facebookUTMs = FacebookUTMParser.parseFacebookUTMs(
-      typeof window !== 'undefined' ? window.location.href : ''
-    );
-    
-    const metaEventData = facebookUTMs ? FacebookUTMParser.extractMetaEventData(facebookUTMs) : {};
-    
-    // Dados de dispositivo
-    const deviceData = {
-      device_type: typeof window !== 'undefined' && window.innerWidth < 768 ? 'mobile' : 
-                   typeof window !== 'undefined' && window.innerWidth < 1024 ? 'tablet' : 'desktop',
-      screen_width: typeof window !== 'undefined' ? window.screen.width : 1920,
-      screen_height: typeof window !== 'undefined' ? window.screen.height : 1080,
-      viewport_width: typeof window !== 'undefined' ? window.innerWidth : 1920,
-      viewport_height: typeof window !== 'undefined' ? window.innerHeight : 1080,
-      pixel_ratio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
-      browser: getBrowserName(),
-      operating_system: getOperatingSystem(),
-      language: typeof navigator !== 'undefined' ? navigator.language : 'pt-BR',
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      connection_type: typeof navigator !== 'undefined' && (navigator as any).connection ? 
-                      (navigator as any).connection.effectiveType : 'unknown'
-    };
-    
-    // Dados de performance
-    const performanceData = {
-      page_load_time: typeof performance !== 'undefined' ? Math.round(performance.now()) : 0,
-      dom_content_loaded: typeof performance !== 'undefined' && performance.timing ? 
-                         performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart : 0,
-      first_contentful_paint: typeof performance !== 'undefined' && (performance as any).getEntriesByType ?
-                            (performance as any).getEntriesByType('paint')[0]?.startTime || 0 : 0
-    };
-    
-    // Combinar todos os enriquecimentos
-    return {
-      // 🎯 Dados do Facebook Ads (se disponíveis)
-      campaign_name: metaEventData.campaign_name || 'unknown',
-      campaign_id: metaEventData.campaign_id || 'unknown',
-      adset_name: metaEventData.adset_name || 'unknown',
-      adset_id: metaEventData.adset_id || 'unknown',
-      ad_name: metaEventData.ad_name || 'unknown',
-      ad_id: metaEventData.ad_id || 'unknown',
-      placement: metaEventData.placement || 'unknown',
-      campaign_type: metaEventData.campaign_type || 'unknown',
-      ad_format: metaEventData.ad_format || 'unknown',
-      targeting_type: metaEventData.targeting_type || 'unknown',
-      audience_segment: metaEventData.audience_segment || 'general',
-      creative_type: metaEventData.creative_type || 'standard',
-      objective_type: metaEventData.objective_type || 'awareness',
-      
-      // 🎯 Dados de dispositivo
-      ...deviceData,
-      
-      // 🎯 Dados de performance
-      ...performanceData,
-      
-      // 🎯 Metadados de sessão
-      session_start_time: Date.now(),
-      page_number: 1,
-      user_journey_stage: 'awareness',
-      content_language: 'pt-BR',
-      market: 'BR',
-      platform: 'web'
-    };
-    
-  } catch (error) {
-    console.error('Erro no enriquecimento avançado:', error);
-    return {};
-  }
-}
-
-/**
- * 🌱 Detecta nome do browser
- */
-function getBrowserName(): string {
-  if (typeof navigator === 'undefined') return 'unknown';
-  
-  const userAgent = navigator.userAgent;
-  if (userAgent.includes('Chrome')) return 'chrome';
-  if (userAgent.includes('Firefox')) return 'firefox';
-  if (userAgent.includes('Safari')) return 'safari';
-  if (userAgent.includes('Edge')) return 'edge';
-  if (userAgent.includes('Opera')) return 'opera';
-  
-  return 'unknown';
-}
-
-/**
- * 🖥️ Detecta sistema operacional
- */
-function getOperatingSystem(): string {
-  if (typeof navigator === 'undefined') return 'unknown';
-  
-  const userAgent = navigator.userAgent;
-  if (userAgent.includes('Windows')) return 'windows';
-  if (userAgent.includes('Mac')) return 'macos';
-  if (userAgent.includes('Linux')) return 'linux';
-  if (userAgent.includes('Android')) return 'android';
-  if (userAgent.includes('iOS')) return 'ios';
-  
-  return 'unknown';
-}
+// Funções de enriquecimento movidas para /enrichment/ (modular)
 /**
  * 🚀 Função principal de disparo de eventos (Unificada)
  */
@@ -283,8 +134,8 @@ export async function fireMetaEventDefinitivo(
   try {
     console.group(`🎯 ${eventName} - Sistema Definitivo (Nota 9.3)`);
     
-    // 1. Obter dados completos do usuário
-    const userData = await getCompleteUserData();
+    // 1. Obter dados completos do usuário (sistema unificado)
+    const userData = await getUserDataForEvent();
     
     // 2. Obter enriquecimento avançado
     const advancedEnrichment = await getAdvancedEnrichment();
