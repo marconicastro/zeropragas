@@ -379,7 +379,7 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST35751', // ✅ MODO TESTE ATIVADO
+    test_event_code: process.env.NEXT_PUBLIC_TEST_EVENT_CODE || 'TEST60998', // ✅ MODO TESTE ATIVADO
     
     // Metadata avançado para qualidade máxima
     debug_mode: false, // MODO PRODUÇÃO - DEBUG DESATIVADO
@@ -442,7 +442,7 @@ async function createLeadEvent(caktoData: any) {
     }],
     
     access_token: META_ACCESS_TOKEN,
-    test_event_code: 'TEST35751', // ✅ MODO TESTE ATIVADO
+    test_event_code: process.env.NEXT_PUBLIC_TEST_EVENT_CODE || 'TEST60998', // ✅ MODO TESTE ATIVADO
   };
 
   console.log('📤 LEAD EVENT (ABANDONMENT):', JSON.stringify(leadEvent, null, 2));
