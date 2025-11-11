@@ -19,6 +19,8 @@
 
 import { getBestAvailableLocation } from './locationData';
 import { getLocationWithCache } from './geolocation-cache';
+import { hashData, hashObject } from './hashing';
+import { normalizeUserData, normalizePhone } from './normalization';
 
 // ============================================
 // INTERFACES E TIPOS
@@ -112,32 +114,8 @@ function cleanExpiredData(): void {
   }
 }
 
-/**
- * Hash SHA-256 para dados PII
- */
-async function hashData(data: string | null | undefined): Promise<string | null> {
-  if (!data) return null;
-  
-  const normalized = data.toString().toLowerCase().trim().replace(/\s+/g, '');
-  
-  try {
-    if (typeof window === 'undefined') {
-      // Server-side: usar Node.js crypto
-      const crypto = await import('crypto');
-      return crypto.createHash('sha256').update(normalized).digest('hex');
-    } else {
-      // Browser-side: usar Web Crypto API
-      const encoder = new TextEncoder();
-      const dataBuffer = encoder.encode(normalized);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (error) {
-    console.error('❌ Erro no hash SHA256:', error);
-    return null;
-  }
-}
+// Hash SHA-256 agora usa sistema centralizado (lib/hashing.ts)
+// Função removida - usar import { hashData } from './hashing'
 
 // ============================================
 // SISTEMA DE SESSÃO
@@ -422,34 +400,31 @@ export function formatUserDataForMeta(userData: UserData | null): Omit<MetaForma
     };
   }
   
-  // Formatar telefone com código do país (55)
-  let phoneWithCountry = '';
-  if (userData.phone) {
-    const phoneClean = userData.phone.replace(/\D/g, '');
-    if (phoneClean.length === 10 || phoneClean.length === 11) {
-      phoneWithCountry = `55${phoneClean}`;
-    } else {
-      phoneWithCountry = phoneClean;
-    }
-  }
+  // Usar sistema centralizado de normalização
+  const normalized = normalizeUserData({
+    email: userData.email,
+    phone: userData.phone,
+    fullName: userData.fullName,
+    city: userData.city,
+    state: userData.state,
+    zipcode: userData.cep,
+    country: userData.country
+  });
   
-  // Separar nome e sobrenome
-  const nameParts = userData.fullName?.toLowerCase().trim().split(' ') || [];
-  const firstName = nameParts[0] || '';
-  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-  
-  // Formatar CEP
-  const zipCode = userData.cep?.replace(/\D/g, '') || '';
+  // Formatar telefone com código do país (55) para Meta Pixel
+  const phoneWithCountry = normalized.phone 
+    ? normalizePhone(normalized.phone, true) // Adiciona código do país
+    : undefined;
   
   return {
-    em: userData.email?.toLowerCase().trim(),
+    em: normalized.email || undefined,
     ph: phoneWithCountry || undefined,
-    fn: firstName || undefined,
-    ln: lastName || undefined,
-    ct: userData.city?.toLowerCase().trim() || null,
-    st: userData.state?.toLowerCase().trim() || null,
-    zp: zipCode || null,
-    country: userData.country || CONFIG.COUNTRY_DEFAULT,
+    fn: normalized.firstName || undefined,
+    ln: normalized.lastName || undefined,
+    ct: normalized.city || null,
+    st: normalized.state || null,
+    zp: normalized.zipcode || null,
+    country: normalized.country,
     external_id: userData.sessionId || getSessionId(),
     client_ip_address: null,
     client_user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null
@@ -458,19 +433,32 @@ export function formatUserDataForMeta(userData: UserData | null): Omit<MetaForma
 
 /**
  * Formata e hasheia dados para Meta Pixel
+ * Usa sistema centralizado de hash para consistência
  */
 export async function formatAndHashUserData(userData: UserData | null): Promise<MetaFormattedUserData> {
   const formatted = formatUserDataForMeta(userData);
   
+  // Usar hashObject para hashear múltiplos campos em paralelo
+  const hashed = await hashObject({
+    em: formatted.em || null,
+    ph: formatted.ph || null,
+    fn: formatted.fn || null,
+    ln: formatted.ln || null,
+    ct: formatted.ct || null,
+    st: formatted.st || null,
+    zp: formatted.zp || null,
+    country: formatted.country || null
+  });
+  
   return {
-    em: await hashData(formatted.em),
-    ph: await hashData(formatted.ph),
-    fn: await hashData(formatted.fn),
-    ln: await hashData(formatted.ln),
-    ct: await hashData(formatted.ct),
-    st: await hashData(formatted.st),
-    zp: await hashData(formatted.zp),
-    country: await hashData(formatted.country),
+    em: hashed.em,
+    ph: hashed.ph,
+    fn: hashed.fn,
+    ln: hashed.ln,
+    ct: hashed.ct,
+    st: hashed.st,
+    zp: hashed.zp,
+    country: hashed.country,
     external_id: formatted.external_id,
     client_ip_address: null,
     client_user_agent: formatted.client_user_agent

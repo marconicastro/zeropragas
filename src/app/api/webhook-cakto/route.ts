@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as crypto from 'crypto';
 import { db } from '@/lib/db';
 import { PRODUCT_CONFIG, ProductHelpers } from '@/config/product';
+import { hashData, hashObject } from '@/lib/hashing';
+import { normalizeUserData, normalizePhone } from '@/lib/normalization';
+import { validateMetaEvent } from '@/lib/validation';
+import { getRateLimiter } from '@/lib/rate-limiting/rate-limiter';
+import { getMetricsCollector, measureLatency } from '@/lib/monitoring/metrics';
 
-// Configurações do Meta
-const META_PIXEL_ID = process.env.META_PIXEL_ID || '642933108377475';
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAUsqHMv8GcBP5dQ8HjQcx4ZCEtCq958ZBKe71qP5ZAUZAtZAGfAN4OzsKZCAsCE3ZATp8cuTn5bWgWI2m35H31nnPKg8CMX3cqWa709DWSPdBXD2vF6P8RMXMZAnRNZCXcwX0nL0sBYbN821XurMRwrHZAM1X5qX7AjljZBabX8XArHoy4MZBZCl06lKHYHyuzBs2AZDZD';
+// Configurações do Meta - CORRIGIDO: Sem fallback hardcoded (P0 - Segurança)
+const META_PIXEL_ID = process.env.META_PIXEL_ID;
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+
+// Validação de variáveis de ambiente obrigatórias
+if (!META_PIXEL_ID || !META_ACCESS_TOKEN) {
+  console.error('❌ ERRO CRÍTICO: META_PIXEL_ID ou META_ACCESS_TOKEN não configurados!');
+  console.error('   Configure as variáveis de ambiente antes de usar o webhook.');
+}
 
 // Configurações da Cakto
 const CAKTO_SECRET = process.env.CAKTO_SECRET || '12f4848f-35e9-41a8-8da4-1032642e3e89';
@@ -17,9 +27,10 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 const TIMEOUT_MS = 15000;
 
-// Cache em memória para prevenção de duplicatas
+// Cache em memória para prevenção de duplicatas - CORRIGIDO: Com limite máximo
 const processedEvents = new Map<string, number>();
 const CACHE_TTL = 300000; // 5 minutos
+const MAX_CACHE_SIZE = 10000; // Limite máximo de eventos no cache (previne memory leak)
 
 // Estatísticas do webhook
 let stats = {
@@ -33,18 +44,17 @@ let stats = {
   averageProcessingTime: 0
 };
 
-// Função para fazer hash SHA-256
-function sha256(data: string): string {
-  return crypto.createHash('sha256').update(data.toLowerCase().trim()).digest('hex');
-}
+// Hash SHA-256 agora usa sistema centralizado (lib/hashing.ts)
+// Função removida - usar import { hashData } from '@/lib/hashing'
 
-// Função para gerar ID único de evento
-function generateEventId(data: any): string {
+// Função para gerar ID único de evento - CORRIGIDO: Usa sistema centralizado
+async function generateEventId(data: any): Promise<string> {
   const eventString = `${data.event}_${data.data?.id || 'unknown'}_${data.data?.customer?.email || 'unknown'}_${Date.now()}`;
-  return sha256(eventString);
+  const hash = await hashData(eventString);
+  return hash || `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Função para prevenir duplicatas
+// Função para prevenir duplicatas - CORRIGIDO: Com limite de tamanho
 function isDuplicate(eventId: string): boolean {
   const now = Date.now();
   const existingTime = processedEvents.get(eventId);
@@ -54,15 +64,22 @@ function isDuplicate(eventId: string): boolean {
     return true;
   }
   
-  processedEvents.set(eventId, now);
-  
-  // Limpar cache antigo
+  // Limpar cache antigo e verificar tamanho
   processedEvents.forEach((timestamp, id) => {
     if (now - timestamp > CACHE_TTL) {
       processedEvents.delete(id);
     }
   });
   
+  // Se cache está muito grande, remover itens mais antigos
+  if (processedEvents.size >= MAX_CACHE_SIZE) {
+    const sortedEntries = Array.from(processedEvents.entries())
+      .sort((a, b) => a[1] - b[1]); // Ordenar por timestamp
+    const toRemove = sortedEntries.slice(0, Math.floor(MAX_CACHE_SIZE * 0.1)); // Remover 10% mais antigos
+    toRemove.forEach(([id]) => processedEvents.delete(id));
+  }
+  
+  processedEvents.set(eventId, now);
   return false;
 }
 
@@ -153,32 +170,44 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     }
   }
   
-  // Formatar EXATAMENTE como sua estrutura formatUserDataForMeta
-  const phoneClean = userDataFromDB.phone?.replace(/\D/g, '') || '';
-  let phoneWithCountry = phoneClean;
+  // CORRIGIDO: Usar sistema centralizado de normalização e hash
+  const normalized = normalizeUserData({
+    email: userDataFromDB.email,
+    phone: userDataFromDB.phone,
+    fullName: userDataFromDB.fullName,
+    city: userDataFromDB.city,
+    state: userDataFromDB.state,
+    zipcode: userDataFromDB.zipcode,
+    country: userDataFromDB.country || 'br'
+  });
   
-  if (phoneClean.length === 10) {
-    phoneWithCountry = `55${phoneClean}`;
-  } else if (phoneClean.length === 11) {
-    phoneWithCountry = `55${phoneClean}`;
-  }
+  // Formatar telefone com código do país para Meta Pixel
+  const phoneWithCountry = normalized.phone 
+    ? normalizePhone(normalized.phone, true) // Adiciona código 55
+    : null;
   
-  const nameParts = userDataFromDB.fullName?.toLowerCase().trim().split(' ') || [];
-  const firstName = nameParts[0] || '';
-  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+  // Hashear todos os campos em paralelo usando sistema centralizado
+  const hashed = await hashObject({
+    em: normalized.email,
+    ph: phoneWithCountry,
+    fn: normalized.firstName,
+    ln: normalized.lastName,
+    ct: normalized.city,
+    st: normalized.state,
+    zp: normalized.zipcode,
+    country: normalized.country
+  });
   
-  const zipCode = userDataFromDB.zipcode?.replace(/\D/g, '') || '';
-  
-  // Criar user_data EXATAMENTE como sua estrutura
+  // Criar user_data usando sistema centralizado
   const unifiedUserData = {
-    em: userDataFromDB.email ? sha256(userDataFromDB.email.toLowerCase().trim()) : null,
-    ph: phoneWithCountry ? sha256(phoneWithCountry) : null,
-    fn: firstName ? sha256(firstName) : null,
-    ln: lastName ? sha256(lastName) : null,
-    ct: userDataFromDB.city ? sha256(userDataFromDB.city.toLowerCase().trim()) : null,
-    st: userDataFromDB.state ? sha256(userDataFromDB.state.toLowerCase().trim()) : null,
-    zp: zipCode ? sha256(zipCode) : null,
-    country: sha256('br'),
+    em: hashed.em,
+    ph: hashed.ph,
+    fn: hashed.fn,
+    ln: hashed.ln,
+    ct: hashed.ct,
+    st: hashed.st,
+    zp: hashed.zp,
+    country: hashed.country,
     external_id: transactionId || `cakto_${Date.now()}`,
     client_ip_address: null, // CORRETO: null no backend
     client_user_agent: 'Cakto-Webhook/3.1-enterprise-unified-server',
@@ -391,6 +420,22 @@ async function createAdvancedPurchaseEvent(caktoData: any, requestId: string) {
     data_processing_options_state: 1000
   };
 
+  // CORRIGIDO: Validar evento antes de enviar (P0)
+  const validation = validateMetaEvent({
+    event_name: 'Purchase',
+    event_time: timestamp,
+    action_source: 'website',
+    event_source_url: 'https://maracujazeropragas.com/',
+    user_data: unifiedUserData,
+    custom_data: purchaseEvent.data[0].custom_data,
+    event_id: eventId
+  });
+  
+  if (!validation.success) {
+    console.error('❌ Validação falhou para Purchase:', validation.errorMessage);
+    // Continuar mesmo com erro (não bloquear webhook), mas logar
+  }
+  
   console.log('📤 PURCHASE EVENT ENTERPRISE UNIFIED SERVER:', JSON.stringify(purchaseEvent, null, 2));
   return { eventId, purchaseEvent };
 }
@@ -450,7 +495,13 @@ async function createLeadEvent(caktoData: any) {
 }
 
 // Função para enviar eventos para Meta com retry
+// CORRIGIDO: Valida variáveis de ambiente antes de usar
 async function sendToMetaWithRetry(eventData: any, eventType: string): Promise<any> {
+  // Validação de variáveis de ambiente (P0 - Segurança)
+  if (!META_PIXEL_ID || !META_ACCESS_TOKEN) {
+    throw new Error('META_PIXEL_ID ou META_ACCESS_TOKEN não configurados. Configure as variáveis de ambiente.');
+  }
+  
   let lastError;
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -551,142 +602,169 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   
+  // ✅ RATE LIMITING - Prevenir abuso
+  const rateLimiter = getRateLimiter();
+  const clientIP = request.headers.get('x-forwarded-for') || 
+                   request.headers.get('x-real-ip') || 
+                   'unknown';
+  
+  const rateLimitResult = rateLimiter.check(clientIP, 100, 60000); // 100 req/min por IP
+  
+  if (!rateLimitResult.allowed) {
+    console.warn(`⚠️ [${requestId}] Rate limit excedido para IP: ${clientIP}`);
+    return NextResponse.json({
+      status: 'rate_limit_exceeded',
+      message: 'Too many requests',
+      retryAfter: rateLimitResult.retryAfter
+    }, {
+      status: 429,
+      headers: {
+        'Retry-After': String(rateLimitResult.retryAfter || 60),
+        'X-RateLimit-Limit': '100',
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(rateLimitResult.resetAt)
+      }
+    });
+  }
+  
   console.log(`🚀 [${requestId}] Webhook Cakto Enterprise v${WEBHOOK_VERSION} - Iniciando`);
   console.log(`📊 Stats atuais:`, JSON.stringify(stats, null, 2));
 
   try {
-    // 1. Receber e validar dados da Cakto
-    const caktoWebhook = await request.json();
-    
-    console.log(`📥 [${requestId}] WEBHOOK RECEBIDO:`, JSON.stringify(caktoWebhook, null, 2));
-    
-    // 2. Validar método HTTP
-    if (request.method !== 'POST') {
-      console.log(`❌ [${requestId}] Método inválido: ${request.method}`);
-      return NextResponse.json({
-        error: 'Método não permitido',
-        allowed_methods: ['POST'],
-        webhook_version: WEBHOOK_VERSION,
-        request_id: requestId
-      }, { status: 405 });
-    }
-
-    // 3. Validar secret da Cakto (SEGURANÇA CRÍTICA)
-    if (caktoWebhook.secret !== CAKTO_SECRET) {
-      console.log(`❌ [${requestId}] SECRET INVÁLIDO!`);
-      console.log(`  - Recebido: ${caktoWebhook.secret}`);
-      console.log(`  - Esperado: ${CAKTO_SECRET}`);
+    // ✅ MÉTRICAS - Medir latência da operação
+    return await measureLatency('webhook.cakto.process', async () => {
+      // 1. Receber e validar dados da Cakto
+      const caktoWebhook = await request.json();
       
-      return NextResponse.json({
-        status: 'error',
-        error: 'invalid_secret',
-        message: 'Secret da Cakto inválido',
-        webhook_version: WEBHOOK_VERSION,
-        request_id: requestId
-      }, { status: 401 });
-    }
-
-    console.log(`✅ [${requestId}] Secret validado com sucesso!`);
-
-    // 4. Prevenção de duplicatas
-    const eventId = generateEventId(caktoWebhook);
-    if (isDuplicate(eventId)) {
-      console.log(`🔄 [${requestId}] Evento duplicado detectado e ignorado: ${eventId}`);
-      return NextResponse.json({
-        status: 'duplicate_ignored',
-        message: 'Evento duplicado ignorado',
-        event_id: eventId,
-        webhook_version: WEBHOOK_VERSION,
-        request_id: requestId,
-        processing_time_ms: Date.now() - startTime
-      });
-    }
-
-    // 5. Validar estrutura básica
-    const eventType = caktoWebhook.event;
-    const data = caktoWebhook.data;
-
-    if (!eventType || !data) {
-      console.log(`❌ [${requestId}] Estrutura inválida - event ou data ausente`);
-      return NextResponse.json({
-        status: 'error',
-        error: 'invalid_structure',
-        message: 'Campos event e data são obrigatórios',
-        webhook_version: WEBHOOK_VERSION,
-        request_id: requestId
-      }, { status: 400 });
-    }
-
-    // 6. Processar eventos específicos
-    let result;
-    stats.totalProcessed++;
-
-    switch (eventType) {
-      case 'purchase_approved':
-        result = await handlePurchaseApproved(data, requestId, startTime);
-        stats.purchaseApproved++;
-        stats.successCount++;
-        break;
-        
-      case 'checkout_abandonment':
-        result = await handleCheckoutAbandonment(data, requestId, startTime);
-        stats.checkoutAbandonment++;
-        stats.successCount++;
-        break;
-        
-      case 'purchase_refused':
-        result = await handlePurchaseRefused(data, requestId, startTime);
-        stats.purchaseRefused++;
-        stats.successCount++;
-        break;
-        
-      default:
-        console.log(`⏭️ [${requestId}] Evento não suportado: ${eventType}`);
+      console.log(`📥 [${requestId}] WEBHOOK RECEBIDO:`, JSON.stringify(caktoWebhook, null, 2));
+      
+      // 2. Validar método HTTP
+      if (request.method !== 'POST') {
+        console.log(`❌ [${requestId}] Método inválido: ${request.method}`);
         return NextResponse.json({
-          status: 'ignored',
-          reason: 'event_not_supported',
-          event_received: eventType,
-          supported_events: ['purchase_approved', 'checkout_abandonment', 'purchase_refused'],
+          error: 'Método não permitido',
+          allowed_methods: ['POST'],
+          webhook_version: WEBHOOK_VERSION,
+          request_id: requestId
+        }, { status: 405 });
+      }
+
+      // 3. Validar secret da Cakto (SEGURANÇA CRÍTICA)
+      if (caktoWebhook.secret !== CAKTO_SECRET) {
+        console.log(`❌ [${requestId}] SECRET INVÁLIDO!`);
+        console.log(`  - Recebido: ${caktoWebhook.secret}`);
+        console.log(`  - Esperado: ${CAKTO_SECRET}`);
+        
+        return NextResponse.json({
+          status: 'error',
+          error: 'invalid_secret',
+          message: 'Secret da Cakto inválido',
+          webhook_version: WEBHOOK_VERSION,
+          request_id: requestId
+        }, { status: 401 });
+      }
+
+      console.log(`✅ [${requestId}] Secret validado com sucesso!`);
+
+      // 4. Prevenção de duplicatas - CORRIGIDO: Função agora é async
+      const eventId = await generateEventId(caktoWebhook);
+      if (isDuplicate(eventId)) {
+        console.log(`🔄 [${requestId}] Evento duplicado detectado e ignorado: ${eventId}`);
+        return NextResponse.json({
+          status: 'duplicate_ignored',
+          message: 'Evento duplicado ignorado',
+          event_id: eventId,
           webhook_version: WEBHOOK_VERSION,
           request_id: requestId,
           processing_time_ms: Date.now() - startTime
         });
-    }
+      }
 
-    // 7. Atualizar estatísticas
-    const processingTime = Date.now() - startTime;
-    stats.averageProcessingTime = Math.round(
-      (stats.averageProcessingTime * (stats.totalProcessed - 1) + processingTime) / stats.totalProcessed
-    );
+      // 5. Validar estrutura básica
+      const eventType = caktoWebhook.event;
+      const data = caktoWebhook.data;
 
-    console.log(`🎉 [${requestId}] Evento processado com sucesso!`);
-    console.log(`📊 Stats atualizadas:`, JSON.stringify(stats, null, 2));
+      if (!eventType || !data) {
+        console.log(`❌ [${requestId}] Estrutura inválida - event ou data ausente`);
+        return NextResponse.json({
+          status: 'error',
+          error: 'invalid_structure',
+          message: 'Campos event e data são obrigatórios',
+          webhook_version: WEBHOOK_VERSION,
+          request_id: requestId
+        }, { status: 400 });
+      }
 
-    // 8. Atualizar dashboard de estatísticas
-    // Nota: userDataFromDB não está disponível aqui, então usamos uma fonte genérica
-    updateStats({
-      eventType: eventType,
-      transactionId: data.id || 'unknown',
-      success: true,
-      processingTime: processingTime,
-      dataSource: 'processed_successfully'
-    });
+      // 6. Processar eventos específicos
+      let result: any;
+      stats.totalProcessed++;
 
-    // 9. Retornar resposta enterprise
-    return NextResponse.json({
-      status: 'success',
-      message: `Evento ${eventType} processado com sucesso`,
-      webhook_version: WEBHOOK_VERSION,
-      request_id: requestId,
-      event_id: eventId,
-      processing_time_ms: processingTime,
-      result: result,
-      statistics: {
-        ...stats,
-        uptime_ms: processingTime,
-        performance_tier: processingTime < 500 ? 'excellent' : processingTime < 1000 ? 'good' : 'acceptable'
-      },
-      timestamp: new Date().toISOString()
+      switch (eventType) {
+        case 'purchase_approved':
+          result = await handlePurchaseApproved(data, requestId, startTime);
+          stats.purchaseApproved++;
+          stats.successCount++;
+          break;
+          
+        case 'checkout_abandonment':
+          result = await handleCheckoutAbandonment(data, requestId, startTime);
+          stats.checkoutAbandonment++;
+          stats.successCount++;
+          break;
+          
+        case 'purchase_refused':
+          result = await handlePurchaseRefused(data, requestId, startTime);
+          stats.purchaseRefused++;
+          stats.successCount++;
+          break;
+          
+        default:
+          console.log(`⏭️ [${requestId}] Evento não suportado: ${eventType}`);
+          return NextResponse.json({
+            status: 'ignored',
+            reason: 'event_not_supported',
+            event_received: eventType,
+            supported_events: ['purchase_approved', 'checkout_abandonment', 'purchase_refused'],
+            webhook_version: WEBHOOK_VERSION,
+            request_id: requestId,
+            processing_time_ms: Date.now() - startTime
+          });
+      }
+
+      // 7. Atualizar estatísticas
+      const processingTime = Date.now() - startTime;
+      stats.averageProcessingTime = Math.round(
+        (stats.averageProcessingTime * (stats.totalProcessed - 1) + processingTime) / stats.totalProcessed
+      );
+
+      console.log(`🎉 [${requestId}] Evento processado com sucesso!`);
+      console.log(`📊 Stats atualizadas:`, JSON.stringify(stats, null, 2));
+
+      // 8. Atualizar dashboard de estatísticas
+      updateStats({
+        eventType: eventType,
+        transactionId: data.id || 'unknown',
+        success: true,
+        processingTime: processingTime,
+        dataSource: 'processed_successfully'
+      });
+
+      // 9. Retornar resposta enterprise
+      return NextResponse.json({
+        status: 'success',
+        message: `Evento ${eventType} processado com sucesso`,
+        webhook_version: WEBHOOK_VERSION,
+        request_id: requestId,
+        event_id: eventId,
+        processing_time_ms: processingTime,
+        result: result,
+        statistics: {
+          ...stats,
+          uptime_ms: processingTime,
+          performance_tier: processingTime < 500 ? 'excellent' : processingTime < 1000 ? 'good' : 'acceptable'
+        },
+        timestamp: new Date().toISOString()
+      });
     });
 
   } catch (error) {

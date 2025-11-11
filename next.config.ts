@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // ✅ NÃO IGNORAR ERROS - TypeScript Strict
   },
   // 禁用 Next.js 热重载，由 nodemon 处理重编译
   reactStrictMode: false,

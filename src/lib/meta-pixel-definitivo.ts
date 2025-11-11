@@ -26,6 +26,8 @@ import { getEnrichedClientData } from './clientInfoService';
 import { getCurrentTimestamp } from './timestampUtils';
 import { getAdvancedEnrichment } from './enrichment/index';
 import type { EnrichmentData } from './enrichment/types';
+import { hashData } from './hashing';
+import { validateMetaEvent } from './validation';
 import { getUTMManager } from './utm-manager';
 import { recordTrackingEvent } from './tracking-monitor';
 import { getMetaPixelCookies } from './fbp-fbc-helper';
@@ -114,26 +116,8 @@ async function sendToCapiGatewayInstant(
   }
 }
 
-/**
- * 🔐 Hash SHA-256 para dados PII (Mantido exatamente como estava)
- */
-async function hashData(data: string | null): Promise<string | null> {
-  if (!data) return null;
-  
-  const normalized = data.toString().toLowerCase().trim().replace(/\s+/g, '');
-  
-  try {
-    const encoder = new TextEncoder();
-    const dataUint8Array = encoder.encode(normalized);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', dataUint8Array);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
-  } catch (error) {
-    console.error('Erro no hash SHA256:', error);
-    return null;
-  }
-}
+// Hash SHA-256 agora usa sistema centralizado (lib/hashing.ts)
+// Função removida - usar import { hashData } from './hashing'
 
 /**
  * 🆔 Gera Event ID único e CORRELACIONADO para deduplicação
@@ -306,6 +290,23 @@ export async function fireMetaEventDefinitivo(
       // Parâmetros personalizados
       ...customParams
     };
+    
+    // 3.5. Validar evento antes de enviar (NOVO - P0)
+    const validation = validateMetaEvent({
+      event_name: eventName,
+      event_time: getCurrentTimestamp(),
+      action_source: 'website',
+      event_source_url: typeof window !== 'undefined' ? window.location.href : '',
+      user_data: userData,
+      custom_data: { ...advancedEnrichment, ...customParams },
+      event_id: eventId
+    });
+    
+    if (!validation.success) {
+      console.error(`❌ Validação falhou para ${eventName}:`, validation.errorMessage);
+      // Continuar mesmo com erro de validação (não bloquear eventos)
+      // Mas logar para debug
+    }
     
     // 4. Disparar evento INSTANTANEAMENTE para CAPI Gateway
     console.log(`🎛️ MODO: ${BROWSER_PIXEL_ENABLED ? 'HÍBRIDO' : 'CAPI-ONLY'} - Evento: ${eventName}`);
